@@ -1,0 +1,52 @@
+Trade With AM — Price Action Trading Agent
+Windows x64 release
+
+1. Keep this entire folder together, including the _internal folder.
+   Copy/extract it to a writable location such as Documents, then double-click
+   PriceActionTradingAgent.exe. Python and PyCharm are not required for this release.
+   Keep LICENSE, THIRD-PARTY-NOTICES.md and third_party_licenses with the package.
+   The app code's MIT license does not replace third-party runtime terms.
+   The Windows runtime includes Microsoft Distributable Code; preserve its
+   additional conditions in third_party_licenses\Python-LICENSE.txt.
+
+2. Install and sign in to Codex CLI separately. Your account needs access to the
+   selected model. Open Codex once to populate its local model catalog. A locally
+   listed model is not proof that your account can invoke it.
+
+3. Install Node.js, TradingView Desktop and the existing TradingView MCP connector
+   separately. Keep your working Codex TradingView MCP configuration. The default
+   connector directory is %USERPROFILE%\tradingview-mcp. Start TradingView with your
+   existing debug launcher on port 9222. This release does not include those tools,
+   credentials, sessions or any exchange integration.
+
+4. For Telegram delivery, COPY telegram_config.example.json to
+   telegram_config.local.json in THIS folder, beside PriceActionTradingAgent.exe.
+   Put your own bot_token and exact numeric chat_id in that private copy; chat_id
+   must remain a quoted JSON string. Never publish or share your private copy.
+   Missing Telegram configuration does not prevent GUI startup. Trade analysis
+   delivery will fail clearly until valid configuration is present.
+
+5. Select a full exchange-qualified symbol, timeframes, levels and a model.
+   Both analysis buttons require confirmation before live chart changes. A symbol
+   mismatch is disclosed before the approved chart is switched. All Charts is
+   intentionally unavailable. Read all confirmation messages before clicking OK.
+
+6. Progress/status remains visible. Show Status reveals the retained technical log.
+   A successful process exit alone does not verify chart drawings or Telegram
+   delivery. Incomplete changes are preserved and there is no automatic retry.
+   Inspect TradingView/Telegram after any partial or uncertain result before retrying.
+
+Nonstandard local installations can use Windows user environment variables:
+SR_TRADINGVIEW_MCP_DIR = your existing connector directory
+SR_NODE_PATH = full path to node.exe
+SR_CODEX_PATH = full path to the supported Codex executable/shim
+Restart the application after changing environment variables.
+
+Ownership/run records are stored under:
+%LOCALAPPDATA%\TradeWithAM\SupportResistanceAgent\runs
+
+This executable is unsigned. Follow your organization's Windows security policy;
+do not disable antivirus or other security protections to run it.
+
+Only the blank example configuration is shipped. The maintainer's offline release
+checks did not perform live AI analysis, chart changes, orders or Telegram sends.
