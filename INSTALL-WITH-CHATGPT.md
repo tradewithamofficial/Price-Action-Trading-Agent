@@ -2,13 +2,12 @@
 
 **A beginner-friendly Windows setup assistant — one step at a time.**
 
-Use this guide for **Trade With AM — Price Action Trading Agent**, the free and open-source project maintained at the planned repository:
+Use this guide for **Trade With AM — Price Action Trading Agent**, the free and open-source project maintained at the official repository:
 
 `https://github.com/tradewithamofficial/Price-Action-Trading-Agent`
 
-Publication is pending during local preparation. The proposed address is not a
-confirmed live repository or a download link. Once published, use only the
-maintainer's actual repository and its Releases page; do not guess an asset URL.
+Published Windows release: [v1.0.0](https://github.com/tradewithamofficial/Price-Action-Trading-Agent/releases/tag/v1.0.0).
+Verified ZIP: [PriceActionTradingAgent-v1.0.0-Windows.zip](https://github.com/tradewithamofficial/Price-Action-Trading-Agent/releases/download/v1.0.0/PriceActionTradingAgent-v1.0.0-Windows.zip).
 
 **Prerequisite:** The TradingView Desktop ↔ Codex integration using TradingView MCP must be working before you run the agent.
 
@@ -44,8 +43,13 @@ IMPORTANT WORKING RULES
 14. Never suggest insecure shortcuts such as disabling antivirus, bypassing all operating system protections, running random internet scripts as administrator, or copying secrets into terminal commands.
 15. At the end, verify that the GUI opens, TradingView MCP connection is working, the user understands the two analysis buttons, and optional Telegram delivery is configured safely. Distinguish verified results from untested features.
 
+16. Ask which operating system I use before assuming Windows. The released EXE is Windows x64; source portability elsewhere is unverified. Check my experience and whether I want installation only or later customization.
+17. Ordinary TradingView Desktop launch does not guarantee CDP debugging. Verify the installed connector's configured loopback host/port (default 127.0.0.1:9222) and identifiable chart targets before blaming app code. One read-only PowerShell check is: Invoke-RestMethod 'http://127.0.0.1:9222/json/list' | Select-Object type,title. Ask for sanitized results and check the existing debug launcher if it fails; do not kill sessions or expose the port publicly.
+18. Check installed Codex/Node versions, then codex login status and codex mcp list where supported. Read official Codex setup/authentication instructions if missing. A dropdown entry is not proof of model access/credits. Do not run a paid probe automatically. Leave All Charts unchecked: it is visible but multi-chart execution is not implemented in V1.
+19. After successful installation ask: "Would you like to keep using the application as it is, or customize and develop additional features?" Offer the full Master Prompt at https://github.com/tradewithamofficial/Price-Action-Trading-Agent/blob/main/docs/CHATGPT_MASTER_PROMPT.md. Future options include implementing All Charts with limits on chart/model usage while preserving single-chart behavior. Do not implement it during installation.
+
 START NOW:
-Ask me whether I am using Windows 10 or Windows 11, and give me one simple first check for my existing TradingView/Codex setup. Wait for my reply before Step 2.
+Ask me only what operating system I am using, then wait.
 ```
 
 ## What this guide helps you do
@@ -57,3 +61,10 @@ Ask me whether I am using Windows 10 or Windows 11, and give me one simple first
 - Verify the application's analysis tools carefully, without placing real trades.
 
 **Important:** This tool provides conditional technical analysis, not investment advice or guaranteed trading signals. Automated live order execution is not part of the current release.
+
+## Continue with guided development
+
+The [full ChatGPT Master Prompt](docs/CHATGPT_MASTER_PROMPT.md) preserves the
+installation workflow and adds project-specific optional customization, including
+All Charts, objective backtesting and trade-journal integration. These are future
+ideas, not promises of V1 features. See [README](README.md) for actual behavior.

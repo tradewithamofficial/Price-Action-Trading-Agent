@@ -15,10 +15,7 @@ External services may require accounts, subscriptions or paid AI usage.
 **The app does not place trades or provide real-money automated execution.**
 Analysis can be wrong; a conditional setup is not a guaranteed signal.
 
-**Publication status:** the first public repository/release is being prepared
-locally. The intended repository is `tradewithamofficial/Price-Action-Trading-Agent`.
-No repository or release was published by this preparation step. No online release
-download URL is claimed here.
+**Published release:** [v1.0.0](https://github.com/tradewithamofficial/Price-Action-Trading-Agent/releases/tag/v1.0.0) · [Official repository](https://github.com/tradewithamofficial/Price-Action-Trading-Agent).
 
 ## Features
 
@@ -57,11 +54,22 @@ license covers project code, not external services or their charges.
 needed for source runs/builds; Python 3.14 is the locally tested series. Tkinter
 must be available in that Python installation. PyCharm is optional.
 
+## Install or Customize with ChatGPT — No Coding Experience Required to Start
+
+Copy the [installation guide](INSTALL-WITH-CHATGPT.md) into a new ChatGPT conversation
+for one-step-at-a-time setup. The [full ChatGPT Master Prompt](docs/CHATGPT_MASTER_PROMPT.md)
+also guides optional, focused development using Codex after installation works.
+Start with the [Windows v1.0.0 release](https://github.com/tradewithamofficial/Price-Action-Trading-Agent/releases/tag/v1.0.0); Python/PyCharm are not needed
+for its EXE, but the existing external Codex/TradingView MCP setup is required for
+analysis. Future examples include implementing the visible **All Charts** checkbox;
+multi-chart processing is not implemented in V1. No code or release asset changes
+are made by this documentation update.
+
 ## Windows release: download and run
 
-After the maintainer publishes the repository, open its **Releases** section and
-download the official Windows distribution asset. Do not guess an EXE download URL.
-If no release exists yet, use the source instructions below.
+Download [PriceActionTradingAgent-v1.0.0-Windows.zip](https://github.com/tradewithamofficial/Price-Action-Trading-Agent/releases/download/v1.0.0/PriceActionTradingAgent-v1.0.0-Windows.zip) from the
+[verified v1.0.0 release](https://github.com/tradewithamofficial/Price-Action-Trading-Agent/releases/tag/v1.0.0).
+If you prefer source, use the instructions below.
 
 1. Extract the complete distribution to a writable folder, such as Documents.
 2. Keep **all** files together, especially `_internal`.
@@ -87,7 +95,7 @@ and outstanding checks.
 
 ## Run from Python source
 
-After publication, use GitHub **Code → Download ZIP**, or clone the actual
+Use GitHub **Code → Download ZIP**, or clone the actual
 repository URL shown by GitHub. Extract/open the source folder. In PowerShell:
 
 ```powershell
@@ -163,7 +171,7 @@ The [technical guide](docs/TECHNICAL.md) preserves connection/discovery, permiss
 identity/ownership verification, grouping, Telegram safeguards, offline testing and
 build details. Avoid unrestricted test discovery: a legacy test reads a live watchlist.
 
-After publication, use the repository's **Issues** tab for bugs and feature requests.
+Use the repository's **Issues** tab for bugs and feature requests.
 Include version, Windows version, reproduction steps, expected/actual behavior and
 sanitized errors. Remove secrets, private paths, chat/account data and run records.
 Use [SECURITY.md](SECURITY.md) for sensitive reports.
