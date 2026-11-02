@@ -1,9 +1,8 @@
 # Trade With AM — Price Action Trading Agent
 
-## [Install with ChatGPT — Step-by-Step](INSTALL-WITH-CHATGPT.md)
+[**Install with ChatGPT — Step-by-Step**](INSTALL-WITH-CHATGPT.md)
 
-**Start here:** [TradingView MCP installation video](https://youtu.be/Qc6d5M-RPGc)
-· [Trade With AM YouTube channel](https://www.youtube.com/@TradeWithAMTrading/videos)
+**Start here:** [TradingView MCP installation video](https://youtu.be/dwptd_aNn6I) · [Trade With AM YouTube channel](https://www.youtube.com/@TradeWithAMTrading/videos)
 
 A Windows desktop app that uses your installed Codex CLI and TradingView MCP
 connection to analyze support/resistance and conditional price-action setups.
