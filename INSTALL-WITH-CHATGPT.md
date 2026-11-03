@@ -13,6 +13,16 @@ Verified ZIP: [PriceActionTradingAgent-v1.0.0-Windows.zip](https://github.com/tr
 
 **Video guide:** [Connect TradingView to Codex using MCP — Trade With AM](https://youtu.be/Qc6d5M-RPGc)
 
+**Source upgrade / v1.1.0 candidate:** the current source uses the complete editable
+`reference_simple/support_resistance.txt` and `reference_simple/price_action.txt`
+prompts through direct Codex CLI execution. Keep 1H, 4H and 1D selected together.
+The setup prompt includes classical chart patterns. Saved final responses stay
+in a private `responses` folder. Packaged candidate prompts are editable beside the
+EXE in `reference_simple`; do not replace the GUI with the reference Python script.
+The controlled live test currently stops on inherited MCP approval for `pane_list`;
+interactive access alone does not verify noninteractive tool permission. No
+v1.1.0 release should be treated as live-verified yet. See [technical details](docs/TECHNICAL.md).
+
 > **How to use:** Open [ChatGPT](https://chatgpt.com/), start a new chat, copy the complete prompt in the block below, and paste it into ChatGPT. Follow its instructions one step at a time.
 
 ## Copy this prompt into ChatGPT

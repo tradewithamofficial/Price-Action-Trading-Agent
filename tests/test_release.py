@@ -21,7 +21,7 @@ from tests import test_trade_setups as trade_tests
 from tests import test_dark_dialogs as dialog_tests
 
 PROJECT = Path(main.__file__).parent
-RELEASE = PROJECT / 'release' / 'PriceActionTradingAgent'
+RELEASE = PROJECT / 'release' / 'v1.1.0' / 'PriceActionTradingAgent'
 EXE = RELEASE / 'PriceActionTradingAgent.exe'
 INTERNAL = RELEASE / '_internal'
 ICON = 'TradeWithAM_Robot.ico'
@@ -48,7 +48,7 @@ class SourceIconTests(unittest.TestCase):
     def test_future_build_uses_new_application_name_and_existing_assets(self):
         build = (PROJECT / 'build.ps1').read_text(encoding='utf-8')
         self.assertIn('--name PriceActionTradingAgent', build)
-        self.assertIn("'release\\PriceActionTradingAgent'", build)
+        self.assertIn("$releaseVersion = 'v1.1.0'", build)
         self.assertIn("'PriceActionTradingAgent.exe'", build)
         self.assertIn(ICON, build)
         self.assertIn('Futuristic AI Robot with Breakout Chart.png', build)
@@ -58,14 +58,18 @@ class SourceIconTests(unittest.TestCase):
 class ReleaseArtifactTests(unittest.TestCase):
     def test_public_resources_runtime_and_blank_example_only(self):
         self.assertEqual({p.name for p in RELEASE.iterdir()},
-                         {'PriceActionTradingAgent.exe', '_internal', 'telegram_config.example.json', 'README-SETUP.txt',
-                          'LICENSE', 'THIRD-PARTY-NOTICES.md', 'third_party_licenses'})
+                         {'PriceActionTradingAgent.exe', '_internal', 'telegram_config.example.json', 'RELEASE-SETUP.txt',
+                          'LICENSE', 'THIRD-PARTY-NOTICES.md', 'third_party_licenses', 'reference_simple'})
         for name in ('LICENSE', 'THIRD-PARTY-NOTICES.md'):
             self.assertEqual((RELEASE / name).read_bytes(), (PROJECT / name).read_bytes())
         for license_file in (PROJECT / 'third_party_licenses').iterdir():
             self.assertEqual((RELEASE / 'third_party_licenses' / license_file.name).read_bytes(),
                              license_file.read_bytes())
-        example = json.loads((RELEASE / 'telegram_config.example.json').read_text())
+        for prompt_name in ('support_resistance.txt', 'price_action.txt'):
+            original = (PROJECT / 'reference_simple' / prompt_name).read_bytes()
+            self.assertEqual((RELEASE / 'reference_simple' / prompt_name).read_bytes(), original)
+            self.assertEqual((INTERNAL / 'reference_simple' / prompt_name).read_bytes(), original)
+        example = json.loads((RELEASE / 'telegram_config.example.json').read_text(encoding='utf-8-sig'))
         self.assertEqual(example, {'bot_token':'', 'chat_id':''})
         forbidden = {'telegram_config.local.json', 'auth.json', 'config.toml', 'models_cache.json',
                      'cookies', 'cookies.sqlite', '.env'}
@@ -82,6 +86,11 @@ class ReleaseArtifactTests(unittest.TestCase):
         pyz = archive.open_embedded_archive('PYZ.pyz')
         for module in ('sr_agent','sr_grouping','telegram_sender','ui_dialogs','customtkinter','PIL.ImageTk'):
             self.assertIn(module, pyz.toc)
+        for module in ('main','sr_agent','sr_grouping','telegram_sender','ui_dialogs'):
+            actual = marshal.loads(archive.extract('main')) if module == 'main' else pyz.extract(module)
+            expected = compile((PROJECT / (module+'.py')).read_text(encoding='utf-8-sig'),
+                               actual.co_filename, 'exec', dont_inherit=True, optimize=0)
+            self.assertEqual(actual, expected, 'Bundled application code is stale: '+module)
         self.assertFalse(any(Path(name).name.lower() in forbidden for name in archive.toc))
 
     def test_windowed_x64_exe_embeds_exact_robot_icon_images(self):
@@ -201,6 +210,10 @@ class ReleaseGuiTests(unittest.TestCase):
         self.assertTrue(self.app.agent_image_label.winfo_ismapped())
         self.assertEqual(self.app.agent_image.cget('dark_image').mode, 'RGBA')
         self.assertEqual(self.agent.PROJECT_DIR, RELEASE)
+        self.assertEqual(self.agent.prompt_directory(), RELEASE / 'reference_simple')
+        for prompt_name in ('support_resistance.txt','price_action.txt'):
+            self.assertEqual(self.agent._load_prompt(prompt_name),
+                             (PROJECT / 'reference_simple' / prompt_name).read_text(encoding='utf-8-sig').strip())
         self.assertEqual(self.telegram.local_config_path(), RELEASE / 'telegram_config.local.json')
         with self.assertRaisesRegex(ValueError, 'Missing telegram_config.local.json'):
             self.telegram.load_config()

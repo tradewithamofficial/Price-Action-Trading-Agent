@@ -55,6 +55,7 @@ class RepositoryReleaseTests(unittest.TestCase):
                 '.codex/auth.json', 'auth.json', 'models_cache.json',
                 '.idea/workspace.xml', '.venv/Lib/private.py', '__pycache__/main.pyc',
                 'diagnostics/snapshot.json', 'runs/analysis.json', 'logs/output.log',
+                'responses/run/final-response.txt', 'reference_simple/support_resistance_response.txt',
                 'build/PriceActionTradingAgent.spec', 'dist/old.exe',
                 'release/PriceActionTradingAgent/telegram_config.local.json',
                 'release/PriceActionTradingAgent/PriceActionTradingAgent.exe',
@@ -72,6 +73,8 @@ class RepositoryReleaseTests(unittest.TestCase):
                 'third_party_licenses/Python-LICENSE.txt',
                 'assets/TradeWithAM_Robot.ico',
                 'assets/Futuristic AI Robot with Breakout Chart.png',
+                'reference_simple/main.py', 'reference_simple/support_resistance.txt',
+                'reference_simple/price_action.txt',
             ]
             result = subprocess.run([
                 'git', '-c', 'core.excludesFile=NUL',
@@ -80,14 +83,15 @@ class RepositoryReleaseTests(unittest.TestCase):
             ], input=('\0'.join(ignored+public)+'\0').encode(), capture_output=True, check=True)
             self.assertEqual(set(result.stdout.decode().strip('\0').split('\0')), set(ignored))
 
-    def test_install_prompt_is_copyable_and_publication_is_not_claimed(self):
+    def test_install_prompt_is_copyable_and_requires_actual_release_verification(self):
         guide = (PROJECT / 'INSTALL-WITH-CHATGPT.md').read_text(encoding='utf-8-sig')
         prompt = re.search(r'```text\n(.*?)\n```', guide, flags=re.S)
         self.assertIsNotNone(prompt)
         self.assertIn('WAIT', prompt.group(1))
         self.assertIn('NEVER ask me to paste', prompt.group(1))
         self.assertIn('Verify the official repository', prompt.group(1))
-        self.assertIn('Publication is pending', guide)
+        self.assertIn('Published Windows release', guide)
+        self.assertIn('Do not invent download links', prompt.group(1))
 
     def test_license_and_community_files_are_ready_for_maintainer_review(self):
         license_text = (PROJECT / 'LICENSE').read_text(encoding='utf-8')

@@ -1,5 +1,5 @@
 Trade With AM — Price Action Trading Agent
-Windows x64 release
+Windows x64 v1.1.0 candidate — live drawing completion not yet verified
 
 1. Keep this entire folder together, including the _internal folder.
    Copy/extract it to a writable location such as Documents, then double-click
@@ -26,7 +26,8 @@ Windows x64 release
    Missing Telegram configuration does not prevent GUI startup. Trade analysis
    delivery will fail clearly until valid configuration is present.
 
-5. Select a full exchange-qualified symbol, timeframes, levels and a model.
+5. Keep all three tested timeframes (1H, 4H and 1D) selected, leave 15m unchecked,
+   and select a full exchange-qualified symbol, S/R count and a model.
    Both analysis buttons require confirmation before live chart changes. A symbol
    mismatch is disclosed before the approved chart is switched. All Charts is
    intentionally unavailable. Read all confirmation messages before clicking OK.
@@ -42,7 +43,15 @@ SR_NODE_PATH = full path to node.exe
 SR_CODEX_PATH = full path to the supported Codex executable/shim
 Restart the application after changing environment variables.
 
-Ownership/run records are stored under:
+Editable prompts are beside this EXE in reference_simple:
+support_resistance.txt drives S/R; price_action.txt includes classical chart patterns.
+Keep both files. Complete final responses and private diagnostics are saved beside
+the EXE in responses\<unique-run-id>. Do not share that folder publicly.
+Codex inherits your existing MCP configuration, without application auto-approval.
+The candidate's controlled live test stopped on pane_list requiring approval in
+noninteractive execution. Do not bypass approvals or retry partial requests blindly.
+
+The shared job lock remains under:
 %LOCALAPPDATA%\TradeWithAM\SupportResistanceAgent\runs
 
 This executable is unsigned. Follow your organization's Windows security policy;

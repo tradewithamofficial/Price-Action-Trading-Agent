@@ -10,7 +10,8 @@ import ui_dialogs as messagebox
 from telegram_sender import DeliveryOutcome, send_trade_analysis
 
 from sr_agent import (
-    DEFAULT_MODEL, DEFAULT_SYMBOL, TIMEFRAMES, build_support_resistance_prompt,
+    DEFAULT_MODEL, DEFAULT_SYMBOL, TIMEFRAMES,
+    validate_selection,
     fallback_symbols, get_tradingview_watchlist,
     load_codex_models, run_support_resistance_analysis, sanitize_output,
     run_trade_setup_analysis,
@@ -212,7 +213,7 @@ class SupportResistanceApp:
             raise ValueError("Levels per side must be a whole number from 1 to 20.") from None
         symbol = DEFAULT_SYMBOL if self.all_charts.get() else self.symbol.get().strip()
         values = (symbol, [f for f, v in self.timeframes.items() if v.get()], count, self.model.get().strip())
-        build_support_resistance_prompt(*values)  # Shared validation for both buttons.
+        validate_selection(*values)  # The tested files require the three higher timeframes.
         return values
 
     def log(self, text):
@@ -321,109 +322,83 @@ class SupportResistanceApp:
         self.refresh_button.configure(state="disabled" if self.refreshing else "normal")
 
     def poll_events(self):
-        try:
-            kind, value = self.events.get_nowait()
-        except queue.Empty:
-            pass
-        else:
-            if kind == "models":
-                self.apply_models(value)
-                self.root.after(100, self.poll_events)
-                return
-            if kind == "watchlist":
-                self.apply_watchlist(value)
-                self.root.after(100, self.poll_events)
-                return
-            if kind == "chart_verified":
-                self.status.set("Codex is running — waiting for response (up to 10 minutes)")
-                self.log("Verified TradingView target:\n" + value)
-                self.root.after(100, self.poll_events)
-                return
-            if kind == "symbol_preview":
-                self.confirm_analysis(*value)
-                self.root.after(100, self.poll_events)
-                return
-            if kind == "telegram_sending":
-                self.status.set("Analysis finished — sending final report to Telegram; waiting for API acceptance…")
-                self.log("Telegram delivery started in the background. Analysis and chart verification outcomes remain separate.")
-                self.root.after(100, self.poll_events)
-                return
-            self.finish_job()
-            if kind == "chart_error":
-                self.status.set("Chart verification failed — Codex was not started")
-                self.log(value)
-                messagebox.showerror("TradingView chart verification failed", value, parent=self.root)
-            elif kind == "error":
-                self.status.set("Execution error — inspect chart before another run")
-                self.log(value)
+            try:
+                kind, value = self.events.get_nowait()
+            except queue.Empty:
+                pass
             else:
-                code = value.return_code if value.return_code is not None else "not available"
-                self.status.set(f"{value.status} | return code: {code} | "
-                                + ("analysis and chart state verified" if kind == "trade_result" and value.drawings_verified else
-                                   "drawings and group verified" if value.drawings_verified else "verification incomplete"))
-                self.log(f"Execution status: {value.status}\nSubprocess return code: {code}")
-                if value.response:
-                    self.log("CODEX RESPONSE\n" + value.response)
-                if value.output and value.output != value.response:
-                    self.log("CODEX STDOUT\n" + value.output)
-                if value.errors:
-                    self.log("CLI DIAGNOSTICS / ERRORS\n" + value.errors)
-                if kind == "trade_result":
-                    if not value.drawings_verified or value.status not in ("completed_verified", "completed_no_trade"):
-                        messagebox.showwarning("Trade Setups — Verification Incomplete",
-                                               f"Outcome: {value.status}\n\n"
-                                               "Drawing/group verification is incomplete. Partial changes may exist and were preserved. "
-                                               "See Output / Status and inspect TradingView before another run. No automatic retry.",
-                                               parent=self.root)
-                    if value.analysis_completed and value.final_analysis:
-                        self.show_telegram_outcome(value)
-                elif value.drawings_verified and value.status == "completed_verified":
-                    messagebox.showinfo("Analysis Completed",
-                                        "Support and resistance levels have been successfully drawn and grouped on TradingView.",
-                                        parent=self.root)
+                if kind == "models":
+                    self.apply_models(value)
+                elif kind == "watchlist":
+                    self.apply_watchlist(value)
+                elif kind == "symbol_preview":
+                    self.confirm_analysis(*value)
+                elif kind == "chart_verified":
+                    self.status.set("Codex is running — waiting for response (up to 10 minutes)")
+                    self.log("Verified TradingView target:\n" + value)
+                elif kind == "telegram_sending":
+                    self.status.set("Analysis finished — sending final report to Telegram; waiting for API acceptance…")
+                    self.log("Telegram delivery started in the background. Analysis and chart verification outcomes remain separate.")
                 else:
-                    self.log("Success was not verified. Review the output and TradingView before another run. No automatic retry.")
-                    messagebox.showwarning("Analysis not fully verified",
-                                           f"Outcome: {value.status}\n\n"
-                                           "Drawing and grouping completion was not verified. Partial changes may exist. "
-                                           "See Output / Status and inspect TradingView before another run. No automatic retry.",
-                                           parent=self.root)
-        self.root.after(100, self.poll_events)
+                    self.finish_job()
+                    if kind in ("chart_error", "error"):
+                        self.status.set("Chart verification failed — Codex was not started" if kind == "chart_error" else "Execution error — inspect the output")
+                        self.log(value)
+                        messagebox.showerror("TradingView chart verification failed" if kind == "chart_error" else "Execution error", value, parent=self.root)
+                    else:
+                        code = value.return_code if value.return_code is not None else "not available"
+                        self.status.set(f"{value.status} | return code: {code} | "
+                                        + ("chart readback verified" if value.drawings_verified else "chart verification incomplete"))
+                        self.log(f"Execution status: {value.status}\nSubprocess return code: {code}")
+                        if value.response_file:
+                            self.log("Final response path: " + value.response_file)
+                        for label, text in (("CODEX RESPONSE", value.response), ("CODEX STDOUT", value.output),
+                                            ("CLI DIAGNOSTICS / ERRORS", value.errors)):
+                            if text:
+                                self.log(label + "\n" + text)
+                        if not value.analysis_completed:
+                            messagebox.showwarning("Analysis did not complete",
+                                f"Outcome: {value.status}\n\n{value.errors}\nNo automatic retry. Inspect any partial chart changes.", parent=self.root)
+                            if value.final_analysis:
+                                self.show_trade_results(value.final_analysis, title="Partial Codex Response")
+                        elif kind == "trade_result":
+                            self.show_telegram_outcome(value)
+                        else:
+                            if value.drawings_verified:
+                                messagebox.showinfo("Analysis Completed",
+                                    "Support and resistance levels have been successfully drawn and grouped on TradingView.", parent=self.root)
+                            else:
+                                messagebox.showwarning("Analysis ready — chart verification incomplete",
+                                    value.verification_details + "\nThe complete Codex response is available; drawing success is not assumed.", parent=self.root)
+                            self.show_trade_results(value.final_analysis, title="Support & Resistance — Analysis Results")
+            self.root.after(100, self.poll_events)
 
     def show_telegram_outcome(self, outcome):
-        delivery = outcome.telegram_delivery
-        accepted = isinstance(delivery, DeliveryOutcome) and delivery.accepted
-        count = len(outcome.trade_report["setups"]) if outcome.trade_report is not None else None
-        chart_ok = outcome.drawings_verified and outcome.status in ("completed_verified", "completed_no_trade")
-        if accepted and count is not None:
-            self.log(f"Telegram API accepted {delivery.accepted_parts}/{delivery.required_parts} messages. "
-                     "This confirms API acceptance, not that the recipient read them.")
-            self.status.set("Analysis completed | Telegram accepted all messages | "
-                            + ("chart verification passed" if chart_ok else "chart verification INCOMPLETE"))
-            if chart_ok:
-                message = ("NO TRADE / WAIT assessment sent to Telegram successfully." if count == 0 else
-                           f"{count} trade setup{'s' if count != 1 else ''} found and sent to Telegram successfully.")
-                messagebox.showinfo("Analysis Completed", message, parent=self.root)
+            delivery = outcome.telegram_delivery
+            accepted = isinstance(delivery, DeliveryOutcome) and delivery.accepted
+            chart_ok = outcome.drawings_verified
+            self.status.set("Analysis completed | " + ("Telegram accepted all messages" if accepted else "Telegram delivery failed/unconfirmed")
+                            + (" | chart verification passed" if chart_ok else " | chart verification INCOMPLETE"))
+            if accepted:
+                self.log(f"Telegram API accepted {delivery.accepted_parts}/{delivery.required_parts} messages. This does not prove recipient reading.")
+                if chart_ok:
+                    messagebox.showinfo("Analysis Completed", "Price-action analysis completed and sent to Telegram. New drawings/groups were independently verified.", parent=self.root)
+                else:
+                    messagebox.showwarning("Telegram Accepted — Chart Verification Incomplete",
+                        "Telegram accepted the complete final analysis, but chart drawings/groups are not fully verified. "
+                        "Inspect TradingView and Output / Status; no automatic retry.", parent=self.root)
             else:
-                messagebox.showwarning("Telegram Accepted — Chart Verification Incomplete",
-                                       "Telegram accepted the final analysis, but chart drawings/groups are not fully verified. "
-                                       "Inspect TradingView and Output / Status; no automatic retry.", parent=self.root)
-                self.show_trade_results(outcome.final_analysis)
-        else:
-            error = delivery.error if isinstance(delivery, DeliveryOutcome) else "No confirmed Telegram delivery record is available."
-            parts = f"Accepted parts: {delivery.accepted_parts}/{delivery.required_parts}. " if isinstance(delivery, DeliveryOutcome) else ""
-            self.log("TELEGRAM DELIVERY NOT CONFIRMED\n" + parts + error)
-            self.status.set("Analysis completed | Telegram delivery failed/unconfirmed | "
-                            + ("chart verification passed" if chart_ok else "chart verification INCOMPLETE"))
-            messagebox.showwarning("Telegram Delivery Failed", "Analysis completed, but Telegram delivery failed.\n\n"
-                                   + parts + error + "\nThe final analysis is available in the Copy/Close window. "
-                                   "Inspect Telegram before a manual resend; no automatic retry.", parent=self.root)
+                error = delivery.error if isinstance(delivery, DeliveryOutcome) else "No confirmed Telegram delivery record is available."
+                parts = f"Accepted parts: {delivery.accepted_parts}/{delivery.required_parts}. " if isinstance(delivery, DeliveryOutcome) else ""
+                self.log("TELEGRAM DELIVERY NOT CONFIRMED\n" + parts + error)
+                messagebox.showwarning("Telegram Delivery Failed", "Analysis completed, but Telegram delivery failed.\n\n"
+                    + parts + error + "\nThe final analysis is available in Copy/Close. No automatic retry.", parent=self.root)
             self.show_trade_results(outcome.final_analysis)
 
-    def show_trade_results(self, text):
+    def show_trade_results(self, text, *, title="Trade Setups — Analysis Results"):
         """Only the validated final explanation enters this popup, never logs."""
         popup = tk.Toplevel(self.root)
-        popup.title("Trade Setups — Analysis Results")
+        popup.title(title)
         popup.geometry("760x580")
         popup.minsize(540, 360)
         popup.resizable(True, True)

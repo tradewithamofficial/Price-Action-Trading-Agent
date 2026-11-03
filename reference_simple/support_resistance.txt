@@ -1,0 +1,48 @@
+Please analyze the currently selected TradingView chart using the TradingView MCP connection.
+
+Use the 1D (daily), 4H, and 1H timeframes to identify the most significant support and resistance levels or zones for the current symbol.
+
+Your main task:
+- Find exactly 3 significant resistance levels/zones ABOVE the current market price.
+- Find exactly 3 significant support levels/zones BELOW the current market price.
+- Draw all 6 directly on the TradingView chart.
+
+Analysis requirements:
+1. Start with the 1D chart to identify major market structure and historically important price areas. Use the 4H chart to confirm and refine them, and the 1H chart for more precise placement.
+2. Consider significant swing highs/lows, repeated price reactions, strong rejections, consolidation boundaries, breakout/retest areas, former support turning into resistance (and vice versa), and confluence across timeframes.
+3. Prioritize the strength and trading relevance of each level rather than simply selecting the three nearest prices. Avoid weak, redundant, or heavily overlapping levels/zones.
+4. Use the latest price visible in TradingView as the reference. The entire price of each resistance line/zone must be above the current price; the entire price of each support line/zone must be below it. Do not count a zone that currently contains the market price among the six.
+5. Decide independently whether EACH important price area is best represented by a HORIZONTAL LINE or a RECTANGULAR ZONE:
+   - Draw a horizontal line where historical reactions consistently respect a relatively precise price.
+   - Draw a zone where the evidence shows a meaningful price range rather than a precise level, such as a cluster of wicks, candle bodies, or repeated turning points.
+   - Keep zones reasonably tight, based on visible price-action evidence, rather than drawing arbitrary wide rectangles.
+6. Use only price levels supported by the chart. Inspect additional visible history where useful; do not invent data or force unsupported precision.
+
+Drawing requirements:
+- Draw the 3 resistance levels/zones and label them R1, R2, R3, ordered from nearest above the current price to farthest above.
+- Draw the 3 support levels/zones and label them S1, S2, S3, ordered from nearest below the current price to farthest below.
+- Make support and resistance visually distinguishable with subtle, readable colors and labels. Keep the chart clean and avoid unnecessarily cluttering it.
+- Use horizontal lines or rectangular zones as appropriate, not a single drawing type for everything.
+- Where practical, extend the drawings far enough to make them useful for watching future price reactions.
+
+TradingView Object Tree organization:
+- Put ALL drawings created for this task, including any separate labels, in ONE Object Tree group named exactly:
+  Support And Resistance Levels
+- Make the group easy to show or hide as a single unit.
+- If a group with this exact name already exists, you may add only your newly created objects to it if that can be done without altering its existing drawings. Otherwise, report the limitation rather than changing existing drawings or groups.
+
+CRITICAL: Preserve everything already on the chart.
+- Do NOT delete, move, resize, edit, recolor, rename, hide, or regroup ANY existing drawing, label, indicator, or Object Tree group.
+- Do NOT clear drawings or reset the chart. Do NOT change existing indicator settings.
+- Create only the new support/resistance objects required by this task.
+- You may switch between the 1D, 4H, and 1H timeframes for analysis, but restore the original chart timeframe and symbol when finished.
+- If an MCP or TradingView limitation prevents creating or grouping an object safely, explain what could not be done. Never claim an object was drawn or grouped unless the operation succeeded.
+
+Final response:
+1. State the symbol, approximate current price, and brief 1D/4H/1H market-structure observations.
+2. List R1, R2, R3 and S1, S2, S3 with the exact line price or zone boundaries, the relevant timeframe(s), and a short explanation of why each matters.
+3. State which levels were drawn as lines and which as zones.
+4. Confirm the group name and which drawing/grouping operations actually succeeded.
+5. Explicitly confirm whether all pre-existing chart drawings and groups were left unchanged; disclose any limitations or incomplete steps.
+
+This is a chart-analysis and drawing task only. Do not place, modify, or cancel any trades or orders.

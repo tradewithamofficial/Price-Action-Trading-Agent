@@ -106,6 +106,8 @@ def _paragraphs(text, bold=False, limit=3000):
 
 def format_trade_messages(report, symbol, timeframes, *, chart_verified, timestamp=None):
     """Only the validated human fields are used; unknown/internal fields ignored."""
+    if isinstance(report, dict) and report.get("format") == "plain_text":
+        return format_final_response(report, symbol, timeframes, chart_verified=chart_verified, timestamp=timestamp)
     if (not isinstance(report, dict) or not isinstance(report.get("final_analysis"), str)
             or len(report["final_analysis"].strip()) < 40 or not isinstance(report.get("setups"), list)
             or len(report["setups"]) > 3):
@@ -178,6 +180,34 @@ def format_trade_messages(report, symbol, timeframes, *, chart_verified, timesta
     messages = [header + f"Message {n}/{len(bodies)}\n\n" + body + footer for n,body in enumerate(bodies, 1)]
     if any(_units(text) > MAX_HTML_UNITS for text in messages):
         raise TelegramError("Report exceeded Telegram's message limit; nothing was sent.")
+    return messages
+
+
+def format_final_response(report, symbol, timeframes, *, chart_verified, timestamp=None):
+    """Send the complete saved human response; no trading-field parser or second AI call."""
+    text = report.get("final_analysis")
+    if report.get("cli_completed") is not True or not isinstance(text, str) or not text.strip():
+        raise TelegramError("No completed Codex final response is available for Telegram.")
+    if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z0-9_]+:[A-Za-z0-9_.!/-]+",symbol):
+        raise TelegramError("Telegram requires the exact selected symbol.")
+    if not isinstance(timeframes,(list,tuple)) or set(timeframes)!={"1H","4H","1D"} or len(timeframes)!=3:
+        raise TelegramError("Telegram requires the three analyzed timeframes.")
+    stamp = datetime.now(timezone.utc) if timestamp is None else timestamp
+    if not isinstance(stamp,datetime) or stamp.utcoffset() is None:
+        raise TelegramError("A timezone-aware analysis timestamp is required.")
+    header = ("<b>TRADE WITH AM — PRICE ACTION TRADING AGENT</b>\n"
+              +html.escape(f"Symbol: {symbol}\nAnalysis: {stamp.isoformat(timespec='seconds')}\nTimeframes: {' / '.join(timeframes)}"))
+    warning = "" if chart_verified else "\n\nChart drawings/groups: NOT INDEPENDENTLY VERIFIED — inspect TradingView."
+    chunks = list(_paragraphs(text,limit=3200))
+    if len(chunks)>MAX_MESSAGES:
+        raise TelegramError("The complete final response exceeds Telegram's multipart limit; nothing was sent.")
+    messages = []
+    for number,chunk in enumerate(chunks,1):
+        part = f"\nPart {number}/{len(chunks)}" if len(chunks)>1 else ""
+        message = header+part+warning+"\n\n"+chunk+"\n\n"+DISCLAIMER
+        if _units(message)>4096:
+            raise TelegramError("A final-response part exceeds Telegram's length limit; nothing was sent.")
+        messages.append(message)
     return messages
 
 

@@ -21,7 +21,7 @@ class SelectionHelperTests(unittest.TestCase):
     def setUp(self):
         self.inspect = self.enterContext(patch.object(sr,"inspect_tradingview_chart",return_value=json.dumps(SOURCE)))
         self.verify = self.enterContext(patch.object(sr,"verify_tradingview_chart",return_value=json.dumps(TARGET)))
-        self.lock = self.enterContext(patch.object(sr,"GroupingSession"))
+        self.lock = self.enterContext(patch.object(sr,"ChartSession"))
         self.run = self.enterContext(patch.object(sr.subprocess,"run",return_value=subprocess.CompletedProcess([],0,
                    json.dumps({"success":True,"symbol":DESTINATION,"chart_ready":True}),"")))
 
@@ -45,7 +45,7 @@ class SelectionHelperTests(unittest.TestCase):
         self.assertEqual(json.loads(self.run.call_args.kwargs["input"]),{"approved_target":SOURCE,"destination":DESTINATION})
         self.verify.assert_called_once_with(DESTINATION)
         self.lock.return_value.exclusive.assert_called_once()
-        self.assertNotIn("chart_set_symbol",sr.TRADINGVIEW_SR_TOOLS)
+        self.assertFalse(hasattr(sr, "TRADINGVIEW_SR_TOOLS"))
 
     def test_no_consent_or_bare_alias_does_not_read_or_switch(self):
         with self.assertRaisesRegex(ValueError,"Explicit confirmation"):

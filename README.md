@@ -6,8 +6,8 @@
 
 A Windows desktop app that uses your installed Codex CLI and TradingView MCP
 connection to analyze support/resistance and conditional price-action setups.
-It draws on TradingView, verifies drawings and Object Tree groups, and can send
-setup explanations to your Telegram destination.
+It asks Codex to draw and group objects on TradingView, independently checks chart
+readbacks where available, and can send the complete final setup analysis to Telegram.
 
 This project is intended to be free and open-source under [MIT](LICENSE).
 External services may require accounts, subscriptions or paid AI usage.
@@ -16,19 +16,27 @@ Analysis can be wrong; a conditional setup is not a guaranteed signal.
 
 **Published release:** [v1.0.0](https://github.com/tradewithamofficial/Price-Action-Trading-Agent/releases/tag/v1.0.0) · [Official repository](https://github.com/tradewithamofficial/Price-Action-Trading-Agent).
 
+**v1.1.0 source/candidate:** the direct CLI upgrade below is offline-tested, but
+live drawing completion is **not verified**. Its first controlled test stopped at
+the inherited `pane_list` approval requirement; no chart changes were made. The
+second live workflow was not attempted through that known blocker. No v1.1.0
+download is advertised until functional verification is sufficient.
+
 ## Features
 
-- **Find Support And Resistance Levels:** combines selected timeframes into lines
+- **Find Support And Resistance Levels:** combines 1D, 4H and 1H into lines
   or zones; defaults to three supports and three resistances in total, grouped as
-  **Support and Resistance Levels**.
-- **Find Trade Setups:** considers up to three conditional ideas with entry,
-  confirmation, invalidation and targets. Verified annotations belong to **Price
+  **Support And Resistance Levels**.
+- **Find Trade Setups:** considers price action and classical chart patterns
+  (including triangles, flags, head and shoulders, doubles and cup/handle), with
+  up to three conditional ideas, entry, confirmation, invalidation and targets.
+  New annotations belong to **Price
   Action Setup 1**, **2** and **3** as needed. **NO TRADE / WAIT** is a valid result.
 - Live selected-watchlist retrieval, clearly labeled fallback symbols and a model
   dropdown sourced from the local Codex catalog. Listing is not an access check.
 - Exact symbol selection on the approved chart after explicit confirmation,
   followed by identity, candlestick, drawing and group verification.
-- Telegram HTML explanations with exact price text and confirmation conditions,
+- Telegram HTML delivery of the complete final response with exact price text and confirmation conditions,
   destination/acknowledgement checks and no automatic resend.
 - Dark CustomTkinter UI/dialogs, robot icon, transparent illustration, always-visible
   progress and retained logs controlled by **Show Status**.
@@ -61,8 +69,7 @@ also guides optional, focused development using Codex after installation works.
 Start with the [Windows v1.0.0 release](https://github.com/tradewithamofficial/Price-Action-Trading-Agent/releases/tag/v1.0.0); Python/PyCharm are not needed
 for its EXE, but the existing external Codex/TradingView MCP setup is required for
 analysis. Future examples include implementing the visible **All Charts** checkbox;
-multi-chart processing is not implemented in V1. No code or release asset changes
-are made by this documentation update.
+multi-chart processing remains unimplemented.
 
 ## Windows release: download and run
 
@@ -85,7 +92,7 @@ protections.
 The maintainer's local build output is:
 
 ```text
-release/PriceActionTradingAgent/PriceActionTradingAgent.exe
+release/v1.1.0/PriceActionTradingAgent/PriceActionTradingAgent.exe
 ```
 
 That is a local path, not a download link. See [release setup](RELEASE-SETUP.txt)
@@ -108,6 +115,33 @@ py -3.14 -m venv .venv
 Reuse an existing environment if already installed. Obtain Python from
 [python.org](https://www.python.org/downloads/windows/) if needed. Do not install
 another trading framework or copy another user's Codex/TradingView profile.
+
+## Editable prompts and direct execution
+
+The GUI entry point remains `main.py`. Each button loads the complete tested file
+from `reference_simple`: **support_resistance.txt** for S/R and **price_action.txt**
+for setups/classical patterns. `reference_simple/main.py` is the preserved example
+runner, not a replacement GUI. Edit the analytical `.txt` files to customize them.
+
+Codex receives the prompt through stdin and saves its complete final answer to
+`responses/<unique-run-id>/final-response.txt` beside the source or EXE. Both
+buttons display that answer; tool logs stay in Show Status/private diagnostics.
+There is no required AI JSON report or application-side drawing/group creation.
+The app adds the approved exact chart and preservation instructions, then checks
+actual before/after chart readbacks where available. A completed CLI response
+and verified chart drawings are separate outcomes.
+
+The current tested prompts require **all three 1H, 4H and 1D**. Other combinations
+are rejected clearly; 15m remains visible for future customization. S/R counts can
+be changed through the existing control when the prompt's count markers are intact.
+Default prompt files retain their complete original analysis instructions.
+
+In the v1.1.0 candidate package, editable files live beside the EXE in
+`reference_simple`, with bundled copies under `_internal`. Keep the complete
+distribution together and use a writable folder for saved responses.
+Codex inherits your installed MCP configuration: this app does not auto-approve
+tools or change global security settings. A working interactive connection does
+not prove every required tool is permitted in noninteractive `codex exec`.
 
 ## Telegram: keep credentials local
 
@@ -139,7 +173,7 @@ it. API acceptance does not prove a person read the message.
    candlestick chart. Do not change charts during analysis.
 2. Select a **full exchange-qualified symbol**, for example `BYBIT:XAUUSDT.P`.
    Bare/approximate aliases such as `BYBIT.P` are not exact targets.
-3. Choose timeframes (defaults: 1H, 4H, 1D), S/R levels per side and an available
+3. Keep all three tested timeframes (1H, 4H, 1D), choose S/R levels per side and an available
    model. Leave **All Charts** unchecked.
 4. Click an analysis button and review **OK / Cancel**, including any actual
    FROM → TO symbol switch. Cancel blocks switching, analysis and Telegram delivery.
@@ -156,8 +190,9 @@ remains displayed after a switch; there is no automatic switch back.
   connection or order placement.
 - Model access, MCP approval policy and TradingView private APIs can change. A
   stale/missing catalog or required approval can block execution safely.
-- Existing named groups or ambiguous ownership require operator review. Old
-  groups/drawings are not automatically adopted, refreshed or deleted.
+- Existing drawings/groups must remain unchanged. The supplied setup prompt permits
+  distinct new group names on collision; ambiguous membership is never adopted.
+  Old groups/drawings are not automatically refreshed or deleted.
 - Timeouts and verification failures may leave partial drawings/groups. There is
   no automatic rollback/retry. Telegram timeout outcomes can be uncertain; inspect
   the destination before any manual resend.
@@ -168,7 +203,7 @@ remains displayed after a switch; there is no automatic switch back.
 
 The [technical guide](docs/TECHNICAL.md) preserves connection/discovery, permissions,
 identity/ownership verification, grouping, Telegram safeguards, offline testing and
-build details. Avoid unrestricted test discovery: a legacy test reads a live watchlist.
+build details and explicit offline test commands.
 
 Use the repository's **Issues** tab for bugs and feature requests.
 Include version, Windows version, reproduction steps, expected/actual behavior and

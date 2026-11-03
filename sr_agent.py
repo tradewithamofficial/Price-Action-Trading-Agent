@@ -8,12 +8,9 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
+import uuid
 
-from sr_grouping import (
-    GROUP_NAME, SETUP_GROUP_NAMES, SETUP_COLORS, GroupingSession,
-    TradeSetupSession, completion_instructions, target_identity,
-)
+from sr_grouping import ChartSession, target_identity, verify_readbacks
 
 
 DEFAULT_SYMBOL = "BYBIT:XAUUSDT.P"
@@ -54,27 +51,12 @@ def node_executable():
     return next((str(path) for path in candidates if path.is_file()), None)
 
 
-# Only these MCP capabilities are authorized for Codex's confirmed analysis stage.
-# The app owns a separate, explicitly confirmed symbol-selection operation.
-# In particular: no deletion, arbitrary JS/UI input, symbol/tab switching,
-# indicator changes, trading, or general-purpose execution tools.
-TRADINGVIEW_SR_TOOLS = (
-    "chart_get_state", "tab_list", "pane_list", "chart_get_visible_range",
-    "data_get_ohlcv", "chart_set_timeframe", "draw_shape", "draw_list",
-    "draw_get_properties",
-)
+# Codex inherits the existing MCP configuration; no new tool grants are injected.
+# Its filesystem sandbox is separate from MCP approval and tool availability.
+# The app owns an explicitly confirmed symbol-selection operation before analysis.
+# Tool denials stop execution; the prompt cannot override a permission boundary.
 
 
-def support_resistance_mcp_arguments():
-    """Invocation-only policy; callers use this only after explicit consent.
-
-    Keep the CLI's noninteractive approval policy and filesystem sandbox intact.
-    Authorize named MCP tools through Codex's supported per-tool settings.
-    """
-    arguments = ["-c", "mcp_servers.tradingview.enabled_tools=" + json.dumps(TRADINGVIEW_SR_TOOLS)]
-    for tool in TRADINGVIEW_SR_TOOLS:
-        arguments += ["-c", f'mcp_servers.tradingview.tools.{tool}.approval_mode="approve"']
-    return arguments
 
 
 @dataclass
@@ -91,6 +73,9 @@ class AnalysisOutcome:
     final_analysis: str = ""
     trade_report: dict | None = None
     telegram_delivery: object | None = None
+    response_file: str = ""
+    verification_details: str = ""
+    run_id: str = ""
 
 
 def sanitize_output(value):
@@ -306,7 +291,7 @@ def ensure_selected_symbol(symbol, approved_chart, *, live_confirmed=False, time
     approved = target_identity(approved_chart)
     # Share the existing job lock: never switch while another app instance is
     # analyzing. The subsequent analysis takes this lock again and re-verifies.
-    session = GroupingSession(approved, verify_tradingview_chart, connector_directory(), node_executable())
+    session = ChartSession(approved, verify_tradingview_chart, connector_directory(), node_executable())
     with session.exclusive():
         if target_identity(inspect_tradingview_chart()) != approved:
             raise ValueError("TradingView changed since confirmation. Nothing was switched; confirm again.")
@@ -336,102 +321,6 @@ def ensure_selected_symbol(symbol, approved_chart, *, live_confirmed=False, time
             raise ValueError("Symbol selection stopped: " + sanitize_output(exc)
                              + " The symbol may have changed. Inspect TradingView; no automatic retry or recovery. Codex was not started.") from None
 
-
-def build_all_charts_prompt(timeframes, levels_per_side=3, model=DEFAULT_MODEL):
-    # Reuse existing input validation. No watchlist or analysis is executed here.
-    build_support_resistance_prompt(DEFAULT_SYMBOL, timeframes, levels_per_side, model)
-    return (
-        "CONCEPT ONLY — ALL CHARTS IS NOT IMPLEMENTED BY THIS APPLICATION.\n\n"
-        f"Requested model: {model}\nTimeframes: {', '.join(dict.fromkeys(timeframes))}\n"
-        f"Future request: find {levels_per_side} support and {levels_per_side} resistance zones "
-        "per chart in the currently selected TradingView watchlist, combining timeframe confluence.\n"
-        "This is a conceptual request only, with no authorization to iterate charts, run analysis "
-        "or change TradingView. A future implementation would need explicit approval and exact "
-        "chart identity checks for every target. Do not execute this request.\n"
-    )
-
-
-def build_support_resistance_prompt(
-    symbol, timeframes, levels_per_side=3, model=DEFAULT_MODEL, *,
-    confirmed_chart="", live_confirmed=False,
-):
-    symbol = str(symbol).strip()
-    if not re.fullmatch(r"[A-Za-z0-9_]+:[A-Za-z0-9_.!/-]+", symbol):
-        raise ValueError("Enter an exchange-qualified TradingView symbol, e.g. BYBIT:XAUUSDT.P.")
-    frames = list(dict.fromkeys(timeframes))
-    if not frames or any(frame not in TIMEFRAMES for frame in frames):
-        raise ValueError("Select at least one of 1H, 4H, 1D or 15m.")
-    if isinstance(levels_per_side, bool) or not isinstance(levels_per_side, int) or not 1 <= levels_per_side <= 20:
-        raise ValueError("Levels per side must be a whole number from 1 to 20.")
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+", str(model)):
-        raise ValueError("Enter a valid Codex model ID.")
-    chart = str(confirmed_chart).strip()
-    if live_confirmed and not chart:
-        raise ValueError("An exact tab/layout/pane identity is required before live execution.")
-    approval = (
-        f"The user explicitly approved this single request. Automatically verified chart identity: {chart!r}.\n"
-        "Read the actual chart identity and compare it with this approved target before any mutation. "
-        "If the identity is unavailable, ambiguous, or mismatched, STOP without changes and explain.\n"
-        if live_confirmed else
-        "There is NO authorization for live chart changes yet. First use read-only MCP tools to report "
-        "the exact tab, layout, active pane, exchange-qualified symbol and timeframe. Ask the user "
-        "to explicitly confirm that exact identity and this drawing request. STOP and wait for "
-        "their reply before changing timeframes, symbols, or drawings.\n"
-    )
-    return (
-        "Trade With AM — Support & Resistance Agent\n\n"
-        f"Requested model: {model}. This is a fresh request; do not assume shared chat/session state.\n"
-        f"TradingView symbol: {symbol}\n"
-        f"Analyze timeframes: {', '.join(frames)}\n"
-        f"Find {levels_per_side} nearby support levels/areas and {levels_per_side} nearby resistance levels/areas "
-        "TOTAL across the selected timeframes, combining confluence rather than multiplying the count per timeframe.\n\n"
-        "Use only the existing configured TradingView MCP connector. The installed connector is at "
-        f"{connector_directory()} and uses TradingView Desktop debugging port 9222. "
-        "Do not install, rebuild or replace it. Do not run the debug launcher, close TradingView, "
-        "use another data provider, or connect to the Bybit API. If MCP is unavailable, stop and report it.\n\n"
-        + approval + "\n"
-        "Before analysis or drawing, read the chart state and available tab/pane identity using read-only MCP tools. "
-        f"Verify that the exact active target is {symbol}, including exchange and perpetual/contract suffix. "
-        "Require standard Candles (chartType 1) and the same verified tab/pane identity; stop if unavailable or mismatched. "
-        "Never switch to another symbol, tab, layout or pane to make it match. If more than one possible "
-        "target exists and cannot be distinguished, stop. Recheck the same identity immediately before drawing.\n\n"
-        "After explicit authorization, analyze visible price structure and available chart data on the selected "
-        "timeframes. You may change timeframe only on the confirmed target, and restore its original timeframe "
-        "when finished. Identify nearby meaningful levels or zones around current price; explain timeframe confluence "
-        "and reasons briefly. Use actual data, never invent prices or force unsupported levels.\n"
-        "Choose the drawing type for each level from market structure, repeated price reactions, swing levels "
-        "and timeframe confluence. Use horizontal_line for a relatively precise support/resistance price. "
-        "Use rectangle only for a genuine zone with meaningful lower and upper price boundaries. "
-        "Do not force all levels to be zones or all levels to be lines, and do not force a mixture without evidence. "
-        "Each line or zone counts as one level/area toward the requested total per side. "
-        "Use red (#ff0000) for resistance and green (#008000) for support, applying connector-supported "
-        "style overrides appropriate to each shape; match rectangle borders and fills where supported.\n"
-        "Visible chart labels must contain ONLY prices and contributing timeframes. "
-        "For a rectangle use 'LOW–HIGH | TF / TF'; for a horizontal line use 'PRICE | TF / TF'. "
-        "Format examples only, not market levels: zone '4155.35–4161.06 | 1H / 4H / 1D'; "
-        "line '4174.50 | 1H / 4H'. Use actual prices with instrument-appropriate precision and "
-        "only selected timeframes that contribute to that level. Do not prefix visible labels with "
-        "'Trade With AM', 'S1 Support', 'S2 Support', 'R1 Resistance', 'R2 Resistance', or any role/sequence label. "
-        "Color distinguishes support from resistance. If label/style rendering is unsupported, report it "
-        "without retrying or changing existing drawings.\n"
-        "Preserve ownership information in documented separate internal identification or hidden metadata "
-        "for newly created objects ONLY if the connector supports it. Do not invent metadata fields or tools. "
-        "If hidden ownership metadata is unsupported, clearly report that limitation. Record returned new "
-        "drawing IDs in the response with the verified target, support/resistance role, geometry and timeframes; "
-        "these identify this run's new objects and are not proof of ownership of existing objects. "
-        "Never infer ownership from color or simplified price/timeframe labels, and never automatically "
-        "modify or delete ambiguously owned objects. The standalone application groups verified new drawings "
-        "under 'Support and Resistance Levels' after analysis. Do not attempt grouping yourself or invent "
-        "a tool or workaround that edits existing objects.\n"
-        "Preserve all existing drawings and indicators. Never delete, replace, move or regroup existing objects. "
-        "Do not place orders, change alerts, open trading panels, or process other charts/watchlist entries. "
-        "Do not implement algorithms, agents, schedulers or write project files.\n"
-        "Do not automatically retry a failed drawing call. On failure, stop and list any objects already created "
-        "and any partial changes; do not clean them up. Read back the new drawing IDs/properties if supported. "
-        "Report the verified target identity, chosen line/zone types and prices/bounds, evidence of created object IDs, grouping "
-        "support, and any errors. Distinguish planned, attempted, confirmed and unverified drawings. "
-        "A zero subprocess exit code is not proof of drawing success.\n"
-    )
 
 
 def codex_command():
@@ -468,242 +357,215 @@ def codex_command():
         return [node, str(path)]
     return [str(path)]
 
+def validate_selection(symbol, timeframes, levels_per_side=3, model=DEFAULT_MODEL):
+    if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z0-9_]+:[A-Za-z0-9_.!/-]+", symbol):
+        raise ValueError("Enter a full exchange-qualified TradingView symbol, e.g. BYBIT:BTCUSDT.P.")
+    if not isinstance(timeframes, (list, tuple)) or set(timeframes) != {"1H", "4H", "1D"} or len(timeframes) != 3:
+        raise ValueError("The tested prompts require 1H, 4H and 1D together. Select all three and leave 15m unchecked.")
+    if type(levels_per_side) is not int or not 1 <= levels_per_side <= 20:
+        raise ValueError("Levels per side must be a whole number from 1 to 20.")
+    if not isinstance(model, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+", model):
+        raise ValueError("Select a valid model from your installed Codex catalog.")
 
-def run_support_resistance_analysis(
-    symbol, timeframes, levels_per_side=3, model=DEFAULT_MODEL, *,
-    confirmed_chart="", live_confirmed=False, timeout=600,
-):
-    """Run once after caller obtains consent. No Tk dependency, retries or GUI side effects.
 
-    Without live_confirmed=True and a chart identity, returns confirmation_required
-    before launching any subprocess. The caller is responsible for obtaining consent.
-    """
+def prompt_directory():
+    bundled = Path(__file__).resolve().parent / "reference_simple"
+    external = PROJECT_DIR / "reference_simple"
+    return external if getattr(sys, "frozen", False) and external.is_dir() else bundled
+
+
+def _load_prompt(filename):
+    path = prompt_directory() / filename
     try:
-        prompt = build_support_resistance_prompt(
-            symbol, timeframes, levels_per_side, model,
-            confirmed_chart=confirmed_chart, live_confirmed=live_confirmed,
-        )
-    except (ValueError, TypeError) as exc:
-        return AnalysisOutcome("invalid_input", errors=str(exc))
+        text = path.read_text(encoding="utf-8-sig").strip()
+    except OSError as exc:
+        raise ValueError(f"Cannot read editable prompt {path}: {exc}") from None
+    if not text:
+        raise ValueError(f"Prompt file is empty: {path}")
+    return text
+
+
+def _execution_context(symbol, confirmed_chart, live_confirmed):
     if not live_confirmed:
-        return AnalysisOutcome("confirmation_required", prompt=prompt,
-                               errors="Explicit live-test approval and exact chart identity are required.")
-    try:
-        session = GroupingSession(confirmed_chart, verify_tradingview_chart, connector_directory(), node_executable())
-        if session.target["symbol"] != symbol:
-            raise ValueError("Approved chart symbol differs from the selected symbol.")
-        with session.exclusive():
-            try:
-                session.prepare()
-            except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as exc:
-                return AnalysisOutcome("grouping_preflight_failed", prompt=prompt, errors=sanitize_output(exc))
-            prompt += completion_instructions(session)
-            outcome = _execute_codex(prompt, model, timeout)
-            if outcome.status == "completed_unverified":
-                try:
-                    path = session.finish(outcome.response, levels_per_side)
-                    outcome.status = "completed_verified"
-                    outcome.drawings_verified = True
-                    outcome.output += f"\nApplication verified drawing properties and exact group membership. Ownership record: {path}"
-                except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.TimeoutExpired) as exc:
-                    outcome.status = "partial_success" if session.record["drawing_ids"] else "completed_unverified"
-                    outcome.errors += "\nDrawing/group verification incomplete: " + sanitize_output(exc)
-            if not outcome.drawings_verified:
-                try:
-                    session.save(outcome.status, error=outcome.errors)
-                except OSError as exc:
-                    outcome.errors += "\nCould not save ownership record: " + sanitize_output(exc)
-                outcome.errors += "\nPartial chart changes may exist. Preserved without cleanup or automatic retry; inspect TradingView before another request."
-            return outcome
-    except (OSError, ValueError, TypeError) as exc:
-        return AnalysisOutcome("grouping_preflight_failed", prompt=prompt, errors=sanitize_output(exc))
-
-
-def build_trade_setup_prompt(
-    symbol, timeframes=("1H", "4H", "1D"), model=DEFAULT_MODEL, *,
-    confirmed_chart="", live_confirmed=False,
-):
-    """Separate price-action request; no S/R count or algorithm is reused."""
-    frames = list(dict.fromkeys(timeframes))
-    build_support_resistance_prompt(symbol, frames, 1, model,
-                                    confirmed_chart=confirmed_chart, live_confirmed=live_confirmed)
-    consent = (
-        f"Explicit approval covers this single conditional setup analysis and its verified new drawings/groups. Approved identity: {confirmed_chart}. "
-        if live_confirmed else
-        "NO live chart changes are authorized. Read and report exact chart identity, then STOP for explicit user confirmation. "
-    )
+        return "\n\nGUI CONTEXT: No chart changes are authorized. Stop for explicit GUI confirmation.\n"
+    target = target_identity(confirmed_chart)
+    if target["symbol"] != symbol:
+        raise ValueError("Selected symbol differs from the approved chart.")
     return (
-        "Trade With AM — Conditional Price Action Trade Setups\n"
-        f"Requested Codex model: {model}\nSelected symbol: {symbol}\nAnalysis timeframes: {', '.join(frames)}\n"
-        + consent + "\n"
-        "Use only the existing configured TradingView MCP. Do not install or modify connectors/configuration. "
-        "Before analysis, timeframe changes and each drawing, verify the exact exchange-qualified selected symbol, "
-        "tab ID, URL/chart ID, layout and active pane against the approved identity, requiring standard Candles (chartType 1). "
-        "Stop on ambiguity/mismatch. Never switch symbol, tab, layout or pane. Change only selected analysis timeframes "
-        "on that target, restoring its original timeframe when finished. No other charts or watchlist iteration.\n"
-        f"Inspect existing drawings and the Object Tree group '{GROUP_NAME}'. The application supplies a verified "
-        "group/membership snapshot below; compare relevant IDs and properties using draw_list/draw_get_properties. "
-        "Consider existing S/R only if still relevant to current evidence. Explain which outdated levels need refreshing "
-        "and why; never overwrite or silently refresh them. Do not infer ownership from labels/colors. "
-        "If S/R is absent, identify relevant levels from current chart evidence. Only when the supplied snapshot "
-        "has no S/R group and no conflicting ownership, you may create up to three evidence-backed supports and three "
-        "resistances as new lines/rectangles, recording them in sr_drawings. The application verifies/groups them. "
-        "If safety or evidence is insufficient, create no S/R drawings and explain what is missing. "
-        "Do not adopt, move, delete, replace, regroup or modify ANY existing drawing, indicator or group.\n"
-        "Analyze market trend and structure, higher highs / higher lows, lower highs / lower lows, breakout and retest, "
-        "trend continuation, pullbacks to support/resistance, technically justified failed breakouts, and relevant "
-        "candlestick confirmation. Use actual current chart data and selected timeframe confluence; never invent prices. "
-        "Identify up to THREE worthwhile CONDITIONAL setups, ranked by relative technical strength/confluence: "
-        "Setup 1 — Primary; Setup 2 — Secondary; Setup 3 — Alternative. Do not fabricate numerical success probabilities "
-        "or claim a trade will succeed. Return fewer than three when warranted; if none are attractive, return "
-        "NO TRADE / WAIT with concrete reasons and no placeholder setups/drawings/groups.\n"
-        "For every valid setup explain LONG or SHORT, strategy type, market structure reasoning, entry area, required "
-        "price-action confirmation, invalidation / protective stop concept, Target 1, Target 2 only when justified, "
-        "approximate risk/reward only when supportable (explain assumptions; otherwise unavailable), and conditions "
-        "that cancel the idea. Confirmation must occur before considering an entry; all ideas remain conditional.\n"
-        "For each valid setup draw real entry areas/levels, confirmation triggers, invalidation levels and target levels "
-        "using the verified horizontal_line and rectangle shapes with short explanatory labels. Represent direction "
-        "in labels; do not probe unsupported directional arrows. Each setup needs four to eight drawings including "
-        "roles entry, confirmation, invalidation, target1; target2 is optional. Use consistent distinct scenario colors: "
-        f"Setup 1 {SETUP_COLORS[0]}, Setup 2 {SETUP_COLORS[1]}, Setup 3 {SETUP_COLORS[2]}. "
-        "Match rectangle borders/fills where supported. Any optional new S/R uses green #008000 for support and red "
-        "#ff0000 for resistance, with price/timeframe-only labels. Record returned new IDs and actual point/property "
-        "readbacks; never claim an unverified object succeeded. No automatic retry or cleanup after a partial failure.\n"
-        f"The application alone creates independent Object Tree groups: {', '.join(SETUP_GROUP_NAMES)}. "
-        "Do not group drawings yourself or request ui_evaluate/arbitrary JavaScript, UI automation or shell workarounds. "
-        "An existing setup group requires ownership inspection and operator review; do not overwrite or duplicate it.\n"
-        "No Bybit/exchange/trading API integration, order placement, live account actions, automatic trade execution, "
-        "Telegram, alerts, trading panels, account access, general-purpose execution or project file changes. "
-        "This request is conditional chart analysis and annotations only.\n"
+        "\n\nGUI-APPROVED TARGET AND SAFETY CONTEXT\n"
+        + json.dumps(target, ensure_ascii=False) + "\n"
+        "Use the existing configured TradingView MCP on this exact exchange-qualified symbol, tab, saved chart, "
+        "layout and single standard-candlestick pane. Verify the target before drawing and stop on mismatch. "
+        "Never switch symbol, exchange, tab, layout or pane. Restore the original timeframe. "
+        "The analytical instructions above are the editable tested prompt; return the complete human-readable "
+        "analysis, not a JSON completion contract. Codex creates the drawings and groups itself. "
+        "Preserve every pre-existing drawing, group (including its membership), study and annotation. "
+        "If a requested name is occupied, follow the prompt's safe alternative/limitation path; never alter "
+        "the occupied group. No automatic retry, cleanup, deletion or replacement. "
+        "Do not bypass a tool denial or approval requirement. No trades/orders, account operations, Telegram, "
+        "alerts, installation, global configuration changes or reading local credentials/project files.\n"
     )
 
 
-def _trade_completion_instructions(session):
-    sr_groups = [g for g in session.before["groups"] if g["name"] == GROUP_NAME]
-    member_ids = {eid for g in sr_groups for eid in g["ids"]}
-    context = {"groups": sr_groups, "drawings": [d for d in session.before["drawings"] if d["id"] in member_ids]}
-    return (
-        "\nAPPLICATION-VERIFIED S/R GROUP CONTEXT (read-only; not permission to adopt objects):\n"
-        + json.dumps(context, ensure_ascii=True) + "\nFINAL-MESSAGE PROTOCOL\n"
-        "Return ONLY a JSON object, without Markdown fences. Required fields: schema=1, "
-        f"run_id={json.dumps(session.run_id)}, target={json.dumps(session.target)}, "
-        "status='complete' only for a completed analysis with all requested readbacks and restored timeframe, "
-        "otherwise 'incomplete'; errors (array), decision ('setups' or 'wait'), final_analysis (string), "
-        "setups (array of zero to three), sr_drawings (array, empty unless safe new S/R was drawn). "
-        "final_analysis must contain ONLY your complete final human-readable conditional setup explanations, "
-        "including rankings, all requested fields and S/R refresh/missing-level observations, or NO TRADE / WAIT "
-        "with reasons. Exclude prompts, raw JSON, MCP calls, execution traces, diagnostics and success claims "
-        "about grouping, which the application has not yet performed.\n"
-        "Each setup object requires rank (consecutive integer from 1), direction ('LONG'/'SHORT'), strategy_type, "
-        "reasoning, entry_area, confirmation, invalidation, target1, cancel_conditions (nonempty strings), "
-        "target2 and risk_reward (explanatory strings when supported, otherwise null), drawings (array). "
-        "Each drawing requires id (actual returned new ID), role, shape ('horizontal_line'/'rectangle'), "
-        "points (actual readback [{time,price}]), properties (actual readback subset including text and linecolor "
-        "for lines, text/color/backgroundColor for rectangles). Setup roles: entry, confirmation, invalidation, "
-        "target1, optional target2. sr_drawings roles: support/resistance. Do not omit or reuse drawing IDs.\n"
-    )
+def build_all_charts_prompt(timeframes, levels_per_side=3, model=DEFAULT_MODEL):
+    return "All Charts is not implemented. This application cannot execute a multi-chart request."
 
 
-def run_trade_setup_analysis(
-    symbol, timeframes=("1H", "4H", "1D"), model=DEFAULT_MODEL, *,
-    confirmed_chart="", live_confirmed=False, timeout=600,
-):
-    """One confirmed price-action job using the existing CLI/lock/connector."""
-    try:
-        prompt = build_trade_setup_prompt(symbol, timeframes, model,
-                                         confirmed_chart=confirmed_chart, live_confirmed=live_confirmed)
-    except (ValueError, TypeError) as exc:
-        return AnalysisOutcome("invalid_input", errors=str(exc))
-    if not live_confirmed:
-        return AnalysisOutcome("confirmation_required", prompt=prompt, errors="Explicit confirmation and exact chart identity are required.")
-    try:
-        session = TradeSetupSession(confirmed_chart, verify_tradingview_chart, connector_directory(), node_executable())
-        if session.target["symbol"] != symbol:
-            raise ValueError("Approved chart symbol differs from the selected symbol.")
-        with session.exclusive():
-            try:
-                session.prepare()
-            except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as exc:
-                return AnalysisOutcome("grouping_preflight_failed", prompt=prompt, errors=sanitize_output(exc))
-            prompt += _trade_completion_instructions(session)
-            outcome = _execute_codex(prompt, model, timeout)
-            if outcome.status == "completed_unverified":
-                try:
-                    count = session.finish(outcome.response)
-                    outcome.status = "completed_verified" if count else "completed_no_trade"
-                    outcome.drawings_verified = True
-                    outcome.output += f"\nApplication verified {count} setup groups and chart preservation. Ownership record: {session.path}"
-                except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.TimeoutExpired) as exc:
-                    outcome.status = "partial_success" if session.record["drawing_ids"] else "completed_unverified"
-                    outcome.errors += "\nTrade setup drawing/group verification incomplete: " + sanitize_output(exc)
-                outcome.analysis_completed = getattr(session, "analysis_completed", False)
-                outcome.final_analysis = sanitize_output(getattr(session, "final_analysis", ""))
-                outcome.trade_report = getattr(session, "completed_report", None)
-            if not outcome.drawings_verified:
-                outcome.errors += "\nPartial changes may exist. No automatic retry or cleanup; inspect TradingView before another request."
-                try:
-                    session.save(outcome.status, error=outcome.errors)
-                except OSError as exc:
-                    outcome.errors += "\nCould not save ownership record: " + sanitize_output(exc)
-            return outcome
-    except (OSError, ValueError, TypeError) as exc:
-        return AnalysisOutcome("grouping_preflight_failed", prompt=prompt, errors=sanitize_output(exc))
+def build_support_resistance_prompt(symbol, timeframes, levels_per_side=3, model=DEFAULT_MODEL, *,
+                                    confirmed_chart="", live_confirmed=False):
+    validate_selection(symbol, timeframes, levels_per_side, model)
+    text = _load_prompt("support_resistance.txt")
+    if levels_per_side != 3:
+        n = levels_per_side
+        replacements = {
+            "exactly 3 significant resistance": f"exactly {n} significant resistance",
+            "exactly 3 significant support": f"exactly {n} significant support",
+            "Draw all 6 directly": f"Draw all {2*n} directly",
+            "the three nearest prices": f"the {n} nearest prices",
+            "among the six.": f"among the {2*n}.",
+            "Draw the 3 resistance levels/zones and label them R1, R2, R3":
+                f"Draw the {n} resistance levels/zones and label them " + ", ".join(f"R{i}" for i in range(1,n+1)),
+            "Draw the 3 support levels/zones and label them S1, S2, S3":
+                f"Draw the {n} support levels/zones and label them " + ", ".join(f"S{i}" for i in range(1,n+1)),
+            "List R1, R2, R3 and S1, S2, S3":
+                "List " + ", ".join(f"R{i}" for i in range(1,n+1)) + " and " + ", ".join(f"S{i}" for i in range(1,n+1)),
+        }
+        if any(text.count(old) != 1 for old in replacements):
+            raise ValueError("This edited S/R prompt cannot safely apply a non-default level count. Use 3 or restore its count markers.")
+        for old, new in replacements.items():
+            text = text.replace(old,new,1)
+    return text + _execution_context(symbol, confirmed_chart, live_confirmed)
+
+
+def build_trade_setup_prompt(symbol, timeframes=("1H", "4H", "1D"), model=DEFAULT_MODEL, *,
+                             confirmed_chart="", live_confirmed=False):
+    validate_selection(symbol,timeframes,3,model)
+    return _load_prompt("price_action.txt") + _execution_context(symbol,confirmed_chart,live_confirmed)
+
+
+def codex_failure(response, output, errors):
+    """Execution/tool-access failures are not successful market WAIT reports."""
+    if re.search(r"(?m)^(?:\d{4}-\S+\s+)?(?:ERROR\b|Error:)", errors):
+        return "Codex reported an infrastructure error; the analysis is incomplete."
+    if re.search(r"unsupported call:|tool discovery failed|(?:MCP|TradingView) (?:connection|tool call) failed",response,re.I):
+        return "TradingView/MCP access failed; this is not a valid market WAIT assessment."
+    if re.match(r"\s*(?:FAILURE\b|I (?:cannot|can't|could not|couldn't) (?:access|connect to) (?:the )?(?:TradingView|MCP))",response,re.I):
+        return "Codex could not complete the requested analysis."
+    return ""
 
 
 def _execute_codex(prompt, model, timeout):
-    """One CLI invocation; grouping and verification stay in the application."""
+    """The reference's one CLI/stdin/final-text-file call, with a bounded timeout."""
+    response_file = None
+    run_id = uuid.uuid4().hex
     try:
+        if type(timeout) not in (int,float) or not 0 < timeout <= 3600:
+            raise ValueError("Codex timeout must be between zero and 3600 seconds.")
         command = codex_command()
+        folder = PROJECT_DIR / "responses" / run_id
+        folder.mkdir(parents=True)
+        response_file = folder / "final-response.txt"
         environment = os.environ.copy()
         node = node_executable()
         if node:
-            # The existing MCP config launches "node" by name. Explorer may
-            # have a stale PATH, so give this child the discovered Node folder.
             environment["PATH"] = str(Path(node).parent) + os.pathsep + environment.get("PATH", "")
-        # A separate CLI process loads the user's existing CODEX_HOME/config.toml.
-        # Reuse the connector transport/auth. Override only this invocation's
-        # exposed TradingView tools and their approval modes, after consent.
-        with tempfile.TemporaryDirectory(prefix="trade_with_am_") as folder:
-            final_file = Path(folder) / "response.txt"
-            command += ["exec"] + support_resistance_mcp_arguments() + [
-                "--model", model, "--sandbox", "read-only",
-                "--skip-git-repo-check", "--color", "never",
-                "--output-last-message", str(final_file), "-",
-            ]
-            completed = subprocess.run(
-                command, input=prompt, capture_output=True, text=True,
-                encoding="utf-8", errors="replace", cwd=PROJECT_DIR,
-                env=environment,
-                timeout=timeout, shell=False,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
-            # The final message is separate from stdout/tool logs. No log fallback.
-            response = sanitize_output(final_file.read_text(encoding="utf-8", errors="replace")) if final_file.exists() else ""
-            output = sanitize_output(completed.stdout)
-            errors = sanitize_output(completed.stderr)
-            status = "completed_unverified" if completed.returncode == 0 else "failed"
-            transcript = "\n".join((response, output, errors)).lower()
-            if "mcp tool call requires approval" in transcript and "approval policy is never" in transcript:
-                status = "approval_blocked"
-                errors += (
-                    "\nCodex reported an MCP tool approval block. No automatic retry was attempted. "
-                    "Use Copy Prompt in your interactive Codex/Astra session and approve only the required "
-                    "TradingView tools, retaining the exact chart checks. Inspect the chart for partial "
-                    "changes before another request. A managed policy may still require interactive approval."
-                )
-            return AnalysisOutcome(
-                status,
-                response=response,
-                errors=errors,
-                return_code=completed.returncode,
-                output=output,
-                prompt=prompt,
-            )
-    except subprocess.TimeoutExpired as exc:
-        return AnalysisOutcome(
-            "timed_out", errors=f"Codex exceeded {timeout} seconds. Partial chart changes may exist. "
-            "Inspect TradingView before another request. No automatic retry.\n" + sanitize_output(exc.stderr),
-            output=sanitize_output(exc.stdout), prompt=prompt,
+        completed = subprocess.run(
+            command + ["exec", "--model", model, "--sandbox", "read-only", "--skip-git-repo-check",
+                       "--output-last-message", str(response_file), "-"],
+            input=prompt, text=True, capture_output=True, encoding="utf-8", errors="replace",
+            cwd=prompt_directory(), env=environment, timeout=timeout, shell=False,
+            creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0),
         )
-    except OSError as exc:
-        return AnalysisOutcome("launch_error", errors=sanitize_output(exc), prompt=prompt)
+        response = response_file.read_text(encoding="utf-8-sig",errors="replace") if response_file.is_file() else ""
+        output, errors = sanitize_output(completed.stdout), sanitize_output(completed.stderr)
+        blocked = bool(re.search(r"MCP tool call requires approval|approval review rejected", "\n".join((response,output,errors)), re.I))
+        failure = codex_failure(response,output,errors)
+        complete = completed.returncode == 0 and bool(response.strip()) and not blocked and not failure
+        status = "completed_response" if complete else "approval_blocked" if blocked else "failed"
+        if blocked:
+            errors += "\nMCP approval was unavailable. No approval policy was bypassed and no operation was retried."
+        elif failure:
+            errors += "\n" + failure
+        elif completed.returncode == 0 and not response.strip():
+            errors += "\nCodex produced no final response file/content. Tool logs are not a final analysis."
+        (folder/"diagnostics.txt").write_text(output+"\n"+errors,encoding="utf-8")
+        return AnalysisOutcome(status,response=response,final_analysis=response,analysis_completed=complete,
+            return_code=completed.returncode,output=output,errors=errors,prompt=prompt,
+            response_file=str(response_file),run_id=run_id)
+    except subprocess.TimeoutExpired as exc:
+        response = response_file.read_text(encoding="utf-8-sig",errors="replace") if response_file and response_file.is_file() else ""
+        return AnalysisOutcome("timed_out",response=response,final_analysis=response,prompt=prompt,
+            errors=f"Codex exceeded {timeout} seconds. Partial chart changes may exist; no automatic retry.\n"+sanitize_output(exc.stderr),
+            output=sanitize_output(exc.stdout),response_file=str(response_file or ""),run_id=run_id)
+    except (OSError,ValueError) as exc:
+        return AnalysisOutcome("launch_error",errors=sanitize_output(exc),prompt=prompt,
+                               response_file=str(response_file or ""),run_id=run_id)
+
+
+def _run_analysis(symbol, timeframes, levels, model, *, trade, confirmed_chart, live_confirmed, timeout):
+    try:
+        builder = build_trade_setup_prompt if trade else build_support_resistance_prompt
+        args = (symbol,timeframes,model) if trade else (symbol,timeframes,levels,model)
+        prompt = builder(*args,confirmed_chart=confirmed_chart,live_confirmed=live_confirmed)
+        if not live_confirmed:
+            return AnalysisOutcome("confirmation_required",prompt=prompt,errors="Explicit GUI confirmation is required.")
+        target = target_identity(confirmed_chart)
+        session = ChartSession(target,verify_tradingview_chart,connector_directory(),node_executable())
+        with session.exclusive():
+            before = None
+            verification = "Independent drawing/group readback is unavailable."
+            try:
+                before = session.snapshot()
+            except (OSError,ValueError,TypeError,KeyError,subprocess.TimeoutExpired) as exc:
+                verification += " " + sanitize_output(exc)
+            # This check is mandatory even when optional drawing readback is unavailable.
+            if target_identity(verify_tradingview_chart(symbol)) != target:
+                return AnalysisOutcome("target_mismatch",prompt=prompt,errors="Approved chart changed before Codex. Nothing was launched.")
+            outcome = _execute_codex(prompt,model,timeout)
+            try:
+                if target_identity(verify_tradingview_chart(symbol)) != target:
+                    raise ValueError("Approved chart identity changed after execution.")
+            except (OSError,ValueError,TypeError,KeyError,subprocess.TimeoutExpired) as exc:
+                outcome.status = "target_mismatch"
+                outcome.analysis_completed = False
+                outcome.errors += "\n" + sanitize_output(exc) + " No retry or recovery was attempted."
+                return outcome
+            try:
+                if before is not None:
+                    after = session.snapshot()
+                    if outcome.response_file:
+                        Path(outcome.response_file).with_name("chart-readbacks.json").write_text(
+                            json.dumps({"before":before,"after":after},indent=2),encoding="utf-8")
+                    verification = verify_readbacks(before,after,trade=trade,levels=levels,response=outcome.response)
+                    outcome.drawings_verified = outcome.analysis_completed
+            except (OSError,ValueError,TypeError,KeyError,subprocess.TimeoutExpired) as exc:
+                verification = "Chart/drawing verification incomplete: " + sanitize_output(exc)
+            outcome.verification_details = verification
+            try:
+                if target_identity(verify_tradingview_chart(symbol)) != target:
+                    raise ValueError("Approved chart changed during final readback.")
+            except (OSError,ValueError,TypeError,KeyError,subprocess.TimeoutExpired) as exc:
+                outcome.status = "target_mismatch"
+                outcome.analysis_completed = outcome.drawings_verified = False
+                outcome.errors += "\n" + sanitize_output(exc)
+                return outcome
+            if not outcome.drawings_verified:
+                outcome.errors += "\n"+verification+"\nInspect the chart before another request; no automatic retry or cleanup."
+            if trade and outcome.analysis_completed:
+                outcome.trade_report = {"format":"plain_text","run_id":outcome.run_id,
+                    "cli_completed":True,"final_analysis":outcome.final_analysis}
+            return outcome
+    except (OSError,ValueError,TypeError,KeyError) as exc:
+        return AnalysisOutcome("invalid_input",errors=sanitize_output(exc))
+
+
+def run_support_resistance_analysis(symbol, timeframes, levels_per_side=3, model=DEFAULT_MODEL, *,
+                                    confirmed_chart="", live_confirmed=False, timeout=600):
+    return _run_analysis(symbol,timeframes,levels_per_side,model,trade=False,
+                         confirmed_chart=confirmed_chart,live_confirmed=live_confirmed,timeout=timeout)
+
+
+def run_trade_setup_analysis(symbol, timeframes, model=DEFAULT_MODEL, *,
+                            confirmed_chart="", live_confirmed=False, timeout=600):
+    return _run_analysis(symbol,timeframes,3,model,trade=True,
+                         confirmed_chart=confirmed_chart,live_confirmed=live_confirmed,timeout=timeout)

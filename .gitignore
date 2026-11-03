@@ -29,6 +29,9 @@ Local State
 /diagnostics/
 /runs/
 /logs/
+/responses/
+/reference_simple/responses/
+/reference_simple/*response*.txt
 *.log
 *.tmp
 *.bak

@@ -1,0 +1,71 @@
+Please analyze the CURRENTLY SELECTED TradingView chart using PRICE ACTION technical analysis and identify up to THREE high-quality potential trade setups.
+
+Use ONLY the 1D (daily), 4H, and 1H timeframes. Build a top-down view: identify the broader daily trend and market structure, refine the key trading areas on 4H, and use 1H where appropriate for setup structure and confirmation. DO NOT switch to or analyze any timeframe lower than 1H. Keep the same symbol and exchange throughout.
+
+SUPPORT AND RESISTANCE
+1. First inspect the TradingView Object Tree.
+2. If an existing group named exactly "Support And Resistance Levels" is present, use the support/resistance lines and zones in that group as important inputs to your analysis. Independently assess whether those levels still make sense with the CURRENT price action; do not assume every previously drawn level remains relevant.
+3. If that group is absent, identify the most significant support and resistance levels/zones yourself from the 1D, 4H, and 1H charts as part of the analysis.
+4. Do NOT modify, delete, move, hide, rename, or regroup the existing support/resistance objects or any other existing drawing. If you identify levels yourself, use them in your analysis and in the new setup drawings where necessary; do not create an unrelated set of support/resistance drawings or overwrite existing groups.
+
+PRICE ACTION SETUP SEARCH
+Look for valid, meaningful opportunities such as:
+- Breakout and retest of horizontal support or resistance (including role reversal).
+- Clean horizontal range breakouts or breakdowns.
+- Trendline breakouts or breakdowns, preferably with a convincing structural confirmation or retest.
+- Classical chart-pattern breakouts, breakdowns, and retests: triangles (ascending, descending, symmetrical), flags, pennants, rectangles/ranges, head and shoulders, inverse head and shoulders, double tops, double bottoms, cup and handle, and other recognizable price-action patterns when genuinely present.
+
+Consider price swing structure (higher highs/higher lows, lower highs/lower lows), consolidation, repeated reactions at a level, failed breakouts, candle closes, possible retests, nearby opposing levels, and the trend/context of the higher timeframe.
+
+Find a MAXIMUM of three distinct, highest-quality setups on the 1D, 4H, or 1H charts. Rank them by clarity and relevance to the CURRENT market, not by the number of patterns found. Avoid presenting several slightly different versions of the same trade as separate setups.
+
+Both long and short ideas are allowed. Setups may be already confirmed and still actionable, or conditional opportunities likely to become interesting if specified events occur. Clearly distinguish a confirmed setup from a developing/unconfirmed one. Never claim a breakout, candle close, retest, or pattern confirmation has occurred unless it is actually visible in the chart data. Do not force three ideas: report one or two if that is all that is credible, and report NO VALID SETUP if none qualifies.
+
+FOR EACH SELECTED SETUP
+1. Give it a clear name and identify the price-action pattern or breakout/retest model.
+2. State the direction (LONG or SHORT), timeframe (1D, 4H, or 1H), setup status (confirmed / waiting for confirmation), and whether it aligns with the higher-timeframe market structure.
+3. State the relevant support/resistance level or zone and the exact chart evidence behind the idea, including the pattern boundaries or neckline/trendline where applicable.
+4. Provide specific ENTRY CONFIRMATION conditions: what price must break, whether a candle needs to CLOSE beyond a level, any retest/hold/rejection requirement, and what would turn a developing idea into a valid entry opportunity. Specify which of the three allowed timeframes should be used for confirmation.
+5. Give a plausible entry price or entry AREA, but only if it can be grounded in the chart. If entry is conditional, label it as a conditional trigger, NOT an immediate buy/sell recommendation.
+6. Specify the INVALIDATION CONDITION and a logical STOP-LOSS location based on relevant swing structure, beyond a significant level/zone or pattern failure point. Distinguish invalidation of the idea from the proposed stop-loss placement when they differ.
+7. Identify at least one and preferably two TAKE-PROFIT targets (TP1 and TP2), using realistic chart-based resistance/support, previous swing points, or a defensible measured-move projection. Mention why those targets were chosen.
+8. Estimate the potential risk-to-reward ratio to TP1 and TP2 if a sufficiently well-defined entry and stop are available. Otherwise state that the ratio depends on the eventual confirmation and entry price. Do not invent precision.
+9. Explain the reasoning, key strengths, important weaknesses/false-breakout risks, and what to watch next.
+
+DRAW THE SETUPS DIRECTLY ON TRADINGVIEW
+For EACH valid setup found, draw a clean, readable representation using suitable TradingView drawing tools supported by the MCP connection:
+- Relevant breakout, retest, support/resistance, neckline, trendline, range, or pattern boundary lines/zones.
+- A clearly labeled potential entry/confirmation area.
+- A clearly labeled stop-loss/invalidation area.
+- TP1 and TP2 where available.
+- A simple arrow or projected path ONLY to illustrate the conditional scenario, not to imply a guaranteed move.
+- Short labels identifying setup number, direction, and timeframe.
+
+Place drawings at prices that reflect the actual analyzed chart. Keep the result uncluttered and visually distinguish the separate trade ideas. Do NOT draw a setup unless there is enough evidence to justify it.
+
+OBJECT TREE ORGANIZATION
+Put only the new drawings for each setup into its own TradingView Object Tree group, named EXACTLY:
+- Price Action Setup 1
+- Price Action Setup 2
+- Price Action Setup 3
+
+Create only as many groups as there are valid setups; e.g., if two setups qualify, use "Price Action Setup 1" and "Price Action Setup 2". Each group's drawings should be independently hideable/showable. Do not move any pre-existing objects into the new groups. If one of these group names already exists, preserve its existing objects; add new drawings only if that can be done without altering them. If an exact new group cannot be made safely, use a distinct clearly reported alternative rather than deleting or overwriting anything.
+
+NON-DESTRUCTIVE OPERATION — VERY IMPORTANT
+Do not delete, edit, move, relabel, hide, or regroup ANY drawings or groups that existed before this request. This includes "Support And Resistance Levels", Elliott Wave groups, previous price-action groups, indicators, and other objects. Do not clear the chart or overwrite previous analyses. It is permitted to temporarily change between the requested 1D, 4H, and 1H timeframes for analysis; restore the original timeframe at the end if possible. Do not place orders or execute trades.
+
+FINAL RESPONSE
+First give a concise multi-timeframe summary covering trend/market structure on 1D, 4H, and 1H, the current market price, and whether you reused the "Support And Resistance Levels" group or identified levels independently.
+
+Then report up to three setups, ranked by quality. For EACH setup, state:
+- Setup number and name; LONG/SHORT; analysis/confirmation timeframe; confirmed or conditional.
+- Key support/resistance and pattern boundaries with actual prices.
+- Precise confirmation trigger and potential entry area.
+- Invalidation and proposed stop-loss level with reasoning.
+- TP1 and TP2, with reasons and risk-to-reward estimates where justified.
+- Why the setup is interesting, what could make it fail, and what to monitor next.
+- Confirmation that its drawings were added to the intended Object Tree group.
+
+Finish with a brief priority/watchlist summary indicating which setup to watch first and exactly what market condition is required. If no valid setups are currently available, explain why and what price action would need to develop; do not fabricate trades.
+
+Verify that any drawings and groups you claim to have created actually exist. If an MCP operation, a drawing tool, or group management is unavailable or fails, clearly say exactly what was completed and what was not. Never claim an action succeeded without verification.
