@@ -2,201 +2,162 @@
 
 [Back to README](../README.md)
 
-These notes describe the existing implementation; they do not authorize live
-operations. The GUI/core separation and application behavior are unchanged.
+## Direct Codex workflow (v1.1.0 candidate)
 
-## Modules and environment
+The existing window, confirmations, background workers and discovery utilities
+remain in place. The two buttons load editable analytical instructions:
 
-| File | Responsibility |
+| File | Used by |
 | --- | --- |
-| `main.py` | CustomTkinter GUI, confirmations, background jobs and outcomes |
-| `sr_agent.py` | Prompts, discovery, chart identity, Codex invocation and results |
-| `sr_grouping.py` | Fixed snapshots/grouping operations and ownership verification |
-| `telegram_sender.py` | Formatting, private config, HTTPS delivery and acknowledgements |
-| `ui_dialogs.py` | Reusable dark modal dialogs |
-| `build.ps1` | Windowed one-folder PyInstaller build and public release resources |
+| `reference_simple/support_resistance.txt` | Find Support And Resistance Levels |
+| `reference_simple/price_action.txt` | Find Trade Setups, including classical chart patterns |
+| `reference_simple/main.py` | Preserved reference runner; not the GUI entry point |
 
-The locally tested runtime is Python 3.14.7 / Tcl-Tk 9.0.4, CustomTkinter 6.0.0 and
-Pillow 13.0.0. Build versions are pinned in `requirements-build.txt`. The connector
-normally lives under `%USERPROFILE%\tradingview-mcp`; the app never installs it.
+The supplied analytical files are preserved. At the default settings their full
+text is sent to Codex, followed by the approved exact chart identity and preservation
+instructions. Both require **1H, 4H and 1D together**; other combinations are
+rejected rather than silently ignored. The S/R count control replaces only known
+count/label phrases for non-default counts. An edited file with missing count
+markers must use the default count or restore the markers. Setup analysis does
+not use the S/R count control. All Charts remains blocked.
 
-## Discovery, watchlist and models
+`sr_agent.py` calls the installed CLI once, with UTF-8 stdin:
+
+```text
+codex exec --model <selected-model> --sandbox read-only --skip-git-repo-check --output-last-message <unique-final-response.txt> -
+```
+
+There is no output schema, final JSON contract, Python pricing engine or
+application-side group creation. Codex uses the existing TradingView MCP setup
+to analyze, draw and group. The app does **not** inject an enabled-tool list or
+auto-approval configuration. The inherited MCP configuration governs available
+tools and approvals; the filesystem sandbox does not authorize MCP calls.
+Noninteractive approval cannot ask an operator a new question. A required approval
+stops the workflow, with no bypass, permission escalation or automatic retry.
+Prompt instructions prohibit orders, existing-object changes and credential access;
+they are not an independent tool-level permission boundary. Use a suitably scoped,
+working Codex/MCP configuration before approving analysis.
+
+The final response comes only from `--output-last-message`, never stdout/tool logs.
+Each request saves `responses/<unique-run-id>/final-response.txt` beside the source
+or EXE; sanitized diagnostics and available chart readbacks stay in that private
+run folder. Failed/timeout partial responses are retained and marked incomplete.
+Nonzero exits, empty final output, tool-approval denials and recognized tool-access
+failures are not successful analysis. Exit zero alone does not verify chart results.
+
+## Discovery and exact chart confirmation
 
 Codex discovery checks PATH and `%APPDATA%\npm\codex.cmd`, resolving the npm shim
 to its installed native executable. Node discovery also checks standard Windows
-installation folders. The discovered Node directory is added to the child PATH
-for MCP startup when Explorer's environment is stale. No global setting is changed.
-Frozen runs use the EXE directory as their working root and reset the bundle's
-DLL search override after Tk starts, before launching external Node/Codex.
+installation folders. Its directory is added to the child PATH, without changing
+the global environment. Frozen startup resets the bundle DLL search override
+before launching external Node/Codex. No PyCharm working directory is required.
 
 | Environment variable | Purpose |
 | --- | --- |
-| `SR_CODEX_PATH` | Explicit Codex executable or supported npm launcher |
+| `SR_CODEX_PATH` | Installed Codex executable or supported npm launcher |
 | `SR_NODE_PATH` | Full path to installed `node.exe` |
 | `SR_TRADINGVIEW_MCP_DIR` | Existing connector directory |
 | `CODEX_HOME` | Existing Codex directory, normally `%USERPROFILE%\.codex` |
-| `SR_SYMBOLS` | Comma-separated exact symbols for the labeled fallback list |
+| `SR_SYMBOLS` | Exact fallback symbols, comma-separated |
 
-Set overrides only for nonstandard installations and restart the app. Explicit
-missing executables fail rather than being silently replaced.
+The default connector is `%USERPROFILE%\tradingview-mcp`. Watchlist Refresh runs
+its read-only `watchlist get` in a background worker with a 25-second timeout.
+Unavailable or empty results are clearly labeled Fallback. Refresh never selects
+a chart. Models come from the local Codex catalog, not an analysis probe; listed
+does not mean account access has been confirmed.
 
-Startup/Refresh uses the existing connector CLI's `watchlist get`, backed by MCP
-`watchlist_get`'s core reader. This background read has a 25-second subprocess
-timeout. It may open the watchlist panel but does not select a symbol/timeframe or
-create drawings. Empty/malformed/unavailable responses show the configured list
-as **Fallback**; actual entries are never mixed with invented symbols.
+Both buttons inspect one saved dedicated chart with one standard candlestick pane.
+The short dark confirmation discloses any actual FROM → TO symbol change. Cancel,
+Escape and X prevent analysis, symbol switching and Telegram delivery. After OK,
+`ensure_selected_symbol()` rechecks the approved chart and uses the existing
+connector `setSymbol` only when needed. Its existing render-wait helper and exact
+destination, tab, URL, chart, layout, pane and candle checks must pass. No aliases,
+tab switching, automatic recovery or switch back to the old symbol are allowed.
 
-Models come from `CODEX_HOME\models_cache.json`, excluding hidden/internal entries.
-Astra is preferred if listed. Entries are **access untested**; no AI invocation
-populates the dropdown. A missing catalog gives an error, not invented choices.
-Open your installed working Codex session to populate its catalog, then Refresh.
+## Read-only drawing verification
 
-## Confirmation and symbol selection
+`sr_grouping.py` now contains only the shared lock and fixed read-only snapshots.
+The app can independently read the approved chart's drawing IDs, points, properties,
+group names/memberships, studies and resolution. It never creates or repairs a group.
 
-Both buttons share `ensure_selected_symbol()`. A background preview identifies
-one saved chart tab and one candlestick pane before the short confirmation
-discloses any actual symbol change. Cancel, Escape and X reject. No analysis,
-chart switch or Telegram delivery follows rejection.
+Before/after comparison requires all existing drawings, groups and study records
+to remain unchanged and the original timeframe to be restored. New grouped objects
+must exist in the readback and belong exclusively to new groups; old IDs cannot be
+adopted. The S/R group is **Support And Resistance Levels**, as spelled in the supplied
+prompt. Setup groups use **Price Action Setup 1**, **2**, **3**, or the prompt's
+distinct-name alternative when existing names are occupied. Existing memberships
+are never silently accepted as changed. Labels and colors do not prove ownership.
 
-After OK, the fixed helper rechecks the approved source and uses the existing
-`chart_set_symbol` / `setSymbol({symbol})` on that active chart. A matching symbol
-makes no setter call. Validated JSON input is not interpolated executable code.
-Full exchange-qualified symbols are required.
+Readback availability is separate from plain analysis completion: if an API is
+unavailable, the complete response can still be displayed, but drawings remain
+explicitly **unverified**. A readback mismatch never triggers repair, retry,
+deletion or regrouping. A clear NO VALID SETUP with no chart changes can be verified
+as a no-drawing outcome. These checks corroborate chart objects and preservation;
+they do not establish analytical correctness or trade outcomes.
 
-The existing `waitForChartRender()` readiness check must pass, followed by exact
-destination/candlestick/tab/chart/layout/pane checks and another strict application
-verification. A header alias or setter success flag is insufficient. Loading
-failure may already have switched the symbol; the app stops without switching
-tabs or attempting recovery. The selected symbol is not automatically switched back.
+The historical shared lock remains under
+`%LOCALAPPDATA%\TradeWithAM\SupportResistanceAgent\runs\analysis.lock`, preventing
+overlap between app instances. After a crash, inspect the chart and close all app
+instances before removing a genuinely stale lock. Old private records are not
+replayed or treated as ownership evidence.
 
-## Invocation-only MCP permissions
+## Results, Telegram and UI
 
-Codex receives the selected model, `--sandbox read-only`, `--skip-git-repo-check`,
-`--color never`, `--output-last-message` and a stdin prompt. The nine-tool list is:
+Both buttons display the entire human-readable final answer in the existing
+Copy/Close results window. S/R success requires independent drawing/group readback.
+Trade setup delivery uses a small plain-text adapter: it sends the complete final
+answer, escaped as Telegram HTML with symbol, timeframes and timestamp. No setup
+parser discards classical-pattern analysis, prices or confirmation conditions.
 
-```text
-chart_get_state, tab_list, pane_list, chart_get_visible_range,
-data_get_ohlcv, chart_set_timeframe, draw_shape, draw_list, draw_get_properties
-```
+The existing structured formatter remains compatible with its offline fixtures;
+the direct workflow uses the complete-response formatter. Formatting finishes
+before HTTPS: conservative 4096 raw-HTML UTF-16 units per part, balanced escaped
+HTML and at most 20 parts. Oversized reports fail rather than being truncated.
+Transport still checks TLS, redirects, response bounds and matching acknowledgements
+(HTTP 200, ok, exact destination, positive unique message ID and parsed text).
+Accepted parts are not automatically resent. API acceptance does not prove reading.
+Failed/blocked execution is not delivered. Unverified chart results carry a warning
+if a completed response is sent. Missing configuration does not block GUI startup.
 
-The app supplies invocation-specific `mcp_servers.tradingview.enabled_tools` and
-per-tool `approval_mode="approve"`. Noninteractive `never` approval cannot collect
-new prompts; managed or disabled-tool restrictions can still block execution.
-The filesystem sandbox is separate from MCP chart permission. No global config
-or connector source is edited.
+Private Telegram configuration stays beside `main.py` or the EXE, outside `_internal`.
+Never publish it. It is read only by delivery, not inserted into Codex's input.
+Background workers, modal consent, duplicate-job protection, progress updates,
+Show Status log retention, dark theme, robot icon and illustration are unchanged.
 
-Astra has no unrestricted `ui_evaluate`, symbol/tab switching, drawing deletion,
-indicator changes or order/account capability. Separate application-controlled
-helpers use fixed validated operations through the existing connector. Failures
-never broaden permissions. There is no automatic AI retry.
+## Offline tests and Windows build
 
-## Drawing ownership, preservation and grouping
-
-S/R prompts allow horizontal lines for precise levels and rectangles for meaningful
-zones, with red resistance and green support. Counts combine selected timeframes.
-Visible labels contain prices/ranges and timeframe confluence. Labels/colors alone
-are not ownership proof.
-
-Before Codex starts, the app snapshots the approved target, drawings, groups,
-indicators and original timeframe. Codex must return final JSON containing the
-application run ID, exact target, completion status, new IDs, roles, geometry and
-styles. Final content comes from the final-message file, never substituted with
-stdout/tool logs. Exit code zero or model assertions do not prove chart success.
-
-Independent snapshots verify the new IDs/points/properties/counts, restored
-timeframe and preservation of existing objects. Only then does the fixed helper
-use `shapesGroupController()` methods including `createGroup(newIds)` and
-`setGroupName` on verified new objects. Another snapshot checks exact group name,
-membership and preservation again.
-
-Only **Support and Resistance Levels**, **Price Action Setup 1**, **Price Action
-Setup 2** and **Price Action Setup 3** are accepted. Existing name collisions stop
-for operator review even if records exist. There is no automatic adoption,
-refresh, overwrite, deletion or regrouping of old objects. Partial failures leave
-objects intact, stop later grouping and do not trigger automatic retry/rollback.
-
-Setup analysis considers structure, continuation, breakout/retest, pullbacks,
-failed breakouts and confirmation. Fewer than three setups or WAIT is valid.
-Existing S/R drawings are read-only context. Setup annotations include entry,
-confirmation, invalidation and targets; blue/purple/orange distinguish groups.
-The results Copy/Close popup contains only the final human explanation.
-
-Private JSON ownership/run records live under
-`%LOCALAPPDATA%\TradeWithAM\SupportResistanceAgent\runs`. That historical internal
-folder name intentionally remains unchanged. Records hold target identity,
-IDs/readbacks, group IDs, times and verification outcomes. They are not ownership
-proof without current chart checks. An exclusive `analysis.lock` prevents overlap.
-After a crash, an operator must inspect charts/records and close all app instances
-before removing a genuinely stale lock. Never remove one to bypass an active job.
-
-## Telegram and UI outcomes
-
-Private config lives beside `main.py` or the EXE, outside `_internal`. It is read
-only by delivery after Codex exits, never included in AI prompts/arguments. The
-public example has two blank strings; numeric chat IDs remain quoted exact strings.
-
-Telegram HTML uses the title **TRADE WITH AM — PRICE ACTION TRADING AGENT**,
-symbol, timezone-aware timestamp, timeframes and ranked LONG/SHORT setups with
-strategy, reasoning, entry, confirmation, invalidation and targets. Exact price
-text, escaping and safety conditions survive without a duplicated full assessment.
-WAIT uses the actual final reason. Each part ends with the conditional-setup line.
-
-Formatting finishes before HTTP. Limits are conservatively 4096 raw-HTML UTF-16
-units per part and 20 parts, with balanced HTML and readable boundaries. Oversized
-reports fail instead of being truncated. HTTPS verifies TLS, bounds responses,
-rejects redirects and has a default 10-second timeout per part. Acknowledgements
-must match HTTP 200, `ok: true`, destination, new positive message ID and parsed text.
-
-Analysis, chart verification and delivery remain separate outcomes. S/R success
-needs drawing/group verification; setup success also needs required Telegram
-acceptance. Unverified chart results retain a warning even if sent. Failure
-preserves the final-analysis popup and sanitized diagnostics. No accepted part
-is resent automatically. Duplicate analysis identities are blocked within the
-session; there is no startup replay, persistent resend queue or read guarantee.
-
-Background jobs preserve GUI responsiveness and prevent overlap. Progress/status
-always remains visible. Show Status controls only retained technical logs, heading
-and scrollbar. Confirmations/simple outcome dialogs are dark; the results popup
-remains standard Tkinter. The illustration preserves alpha/aspect ratio and is
-skipped if unreadable. Assets resolve relative to the module, including a bundle.
-
-## Offline tests and builds
-
-From the source folder with `requirements-build.txt` installed:
+From the source folder, with the existing build requirements installed:
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest tests.test_repository_release tests.test_dark_dialogs tests.test_dark_ui tests.test_status_visibility tests.test_agent_image tests.test_trade_setups tests.test_symbol_selection tests.test_telegram_sender tests.test_grouping tests.test_preservation_diagnostics tests.test_mcp_approval tests.test_prompt_styles tests.test_packaging -v
+.\.venv\Scripts\python.exe -m unittest tests.test_direct_analysis tests.test_grouping tests.test_mcp_approval tests.test_prompt_styles tests.test_preservation_diagnostics tests.test_telegram_sender tests.test_trade_setups tests.test_symbol_selection tests.test_status_visibility tests.test_dark_ui tests.test_dark_dialogs tests.test_agent_image tests.test_packaging tests.test_repository_release -q
 ```
 
-Services are mocked and fixed helper operations use fake connector/chart modules.
-Node.js is needed for helper tests. GUI tests require a Windows desktop session.
-Do not use `unittest discover`: legacy `tests.test_packaged_gui` reads a live watchlist.
+These suites mock services. GUI tests need a Windows desktop. Some symbol-helper
+tests execute fake connector modules with Node.js; they never contact TradingView.
+The obsolete packaged test that read a real watchlist has been removed.
 
-After building, `tests.test_release` checks the bundle/resources/icon and extracted
-GUI code, then launches/closes its own idle EXE child using missing connector/Node/
-Codex paths and a synthetic model catalog. It does not call live services:
+Run `.\build.ps1` for the existing pinned PyInstaller **one-folder/windowed** build
+with the official CustomTkinter/Pillow hooks. The candidate output is
+`release/v1.1.0/PriceActionTradingAgent/PriceActionTradingAgent.exe`.
+Both analytical files ship beside the EXE in `reference_simple` for editing and
+inside `_internal/reference_simple` as bundled resources. The external folder takes
+precedence; a missing file in that folder is an error, not a hidden fallback.
+If the external folder is absent, bundled resources are used. The reference Python
+runner stays in source only. The build generates a blank public Telegram example
+and retains the icon, illustration, setup instructions and all license notices.
+Private responses/configuration are not bundled; previous v1.0.0 assets are retained.
+
+After building:
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest tests.test_release -v
+.\.venv\Scripts\python.exe -m unittest tests.test_release -q
 ```
 
-Build with `.\build.ps1`. It locates paths relative to itself and uses pinned
-PyInstaller **`--onedir --windowed`** with official CustomTkinter/Pillow hooks.
-Output is `release/PriceActionTradingAgent/PriceActionTradingAgent.exe`, `_internal`,
-blank config, setup instructions and license/notice files. Only the public ICO/PNG
-are explicitly added as UI data. Private config or a populated example stops the
-build. Generated specs/caches stay in `build/`; reviewed ZIPs belong in GitHub
-Releases, not the source repository.
-
-Step 542's EXE was 3,485,420 bytes; its 91-file distribution before adding license
-materials was 42,428,071 bytes. Startup and 62 unique offline checks passed then.
-That is local historical evidence, not a guarantee for another computer. See the
-[current publication checklist](RELEASE-CHECKLIST.md).
+Release tests inspect the actual archive and resources, exercise the archived GUI
+with services mocked, and launch the idle EXE with unavailable connector/CLI paths
+and a synthetic catalog. They do not run AI, mutate charts or send Telegram.
 
 References: [CustomTkinter packaging](https://customtkinter.tomschimansky.com/documentation/packaging/),
 [PyInstaller external programs](https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html#launching-external-programs-from-the-frozen-application),
 [MCP tutorial](https://youtu.be/Qc6d5M-RPGc).
-
-Core prompt builders remain reusable without the GUI. Unconfirmed analysis-runner
-calls return `confirmation_required`; any future caller still needs explicit
-per-request consent and the verified target. No six-agent controller is included.

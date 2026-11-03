@@ -44,7 +44,11 @@ class DarkGuiTests(unittest.TestCase):
             if isinstance(widget, ctk.CTkCheckBox):
                 if widget.cget('text') in ('1H', '1D'):
                     widget.toggle()
-        self.assertEqual(self.app.selection(), ('BYBIT:BTCUSDT.P', ['4H'], 4, 'gpt-6-sol'))
+        with self.assertRaisesRegex(ValueError, 'tested prompts require'):
+            self.app.selection()
+        for frame in ('1H', '1D'):
+            self.app.timeframes[frame].set(True)
+        self.assertEqual(self.app.selection(), ('BYBIT:BTCUSDT.P', ['1H', '4H', '1D'], 4, 'gpt-6-sol'))
         self.assertEqual(self.app.levels_box.cget('values'), [str(n) for n in range(1, 21)])
         self.assertEqual(self.app.model_box.cget('state'), 'readonly')
         self.app.all_charts_box.toggle()

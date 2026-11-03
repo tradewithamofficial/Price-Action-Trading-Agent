@@ -88,6 +88,16 @@ class TelegramTests(unittest.TestCase):
                                      chart_verified=True,live_send_enabled=True,config_path=self.config,
                                      timestamp=STAMP,connection_factory=self.http,**kwargs)
 
+    def test_direct_final_response_uses_existing_acknowledgement_transport(self):
+        text = 'Triangle breakout <conditional>: entry 100.25; stop 99.50; wait for a close.'
+        data = {'format':'plain_text','cli_completed':True,'run_id':'offline-direct','final_analysis':text}
+        result = self.send(data)
+        self.assertTrue(result.accepted)
+        self.assertEqual(result.accepted_parts, 1)
+        self.assertEqual(len(self.http.payloads), 1)
+        self.assertIn(html.escape(text), self.http.payloads[0]['text'])
+        self.assertEqual(self.http.payloads[0]['parse_mode'], 'HTML')
+
     def test_success_requires_every_exact_destination_message_ack(self):
         result=self.send()
         self.assertTrue(result.accepted)
@@ -304,6 +314,29 @@ class TelegramTests(unittest.TestCase):
         self.assertNotIn(TOKEN,repr(tg.TelegramConfig(TOKEN,CHAT)))
 
 
+class PlainResponseTests(unittest.TestCase):
+    def test_complete_response_exact_prices_and_html_are_preserved(self):
+        text='Setup 1 — LONG triangle. Entry 100.2500 < 101 & stop 99.1250. Wait for a 1H close. TP1 104.8750.'
+        data={'format':'plain_text','cli_completed':True,'final_analysis':text}
+        messages=tg.format_trade_messages(data,TARGET['symbol'],['1H','4H','1D'],chart_verified=True,timestamp=STAMP)
+        self.assertEqual(len(messages),1)
+        self.assertIn(html.escape(text),messages[0])
+        self.assertEqual(messages[0].count('Setup 1'),1)
+    def test_long_plain_response_splits_without_dropping_any_text(self):
+        text=('Conditional SHORT pattern. Wait for close and retest; stop 103.1250, TP1 98.7500.\n'*120)
+        data={'format':'plain_text','cli_completed':True,'final_analysis':text}
+        messages=tg.format_trade_messages(data,TARGET['symbol'],['1H','4H','1D'],chart_verified=True,timestamp=STAMP)
+        self.assertGreater(len(messages),1)
+        combined=''.join(html.unescape(m.split('\n\n',1)[1].rsplit('\n\n'+tg.DISCLAIMER,1)[0]) for m in messages)
+        self.assertEqual(combined,text)
+        self.assertTrue(all(tg._units(m)<=4096 for m in messages))
+    def test_failed_or_empty_analysis_is_not_sent_and_unverified_charts_are_disclosed(self):
+        data={'format':'plain_text','cli_completed':False,'final_analysis':'Offline report.'}
+        with self.assertRaises(tg.TelegramError):tg.format_trade_messages(data,TARGET['symbol'],['1H','4H','1D'],chart_verified=False)
+        data['cli_completed']=True
+        self.assertIn('NOT INDEPENDENTLY VERIFIED',tg.format_trade_messages(data,TARGET['symbol'],['1H','4H','1D'],chart_verified=False)[0])
+
+
 class TelegramGuiTests(unittest.TestCase):
     setUp=trade_tests.SetupGuiTests.setUp
     close=trade_tests.SetupGuiTests.close
@@ -322,8 +355,8 @@ class TelegramGuiTests(unittest.TestCase):
             self.app.events.put(('trade_result',value));self.app.poll_events()
             self.success.assert_called_once()
             self.assertEqual(self.success.call_args.args[0],'Analysis Completed')
-            if count:self.assertIn(f'{count} trade setup',self.success.call_args.args[1])
-            else:self.assertIn('NO TRADE / WAIT',self.success.call_args.args[1])
+            self.assertIn('analysis completed and sent to Telegram',self.success.call_args.args[1])
+            self.assertIn('independently verified',self.success.call_args.args[1])
         self.assertIn('accepted all',self.app.status.get())
 
     def test_incomplete_acceptance_fails_and_preserves_copy_fallback(self):

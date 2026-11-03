@@ -162,7 +162,7 @@ class StatusVisibilityTests(unittest.TestCase):
     def test_progress_and_status_remain_visible_after_verified_completion(self):
         self.app.running = True
         self.app.progress.start()
-        self.app.events.put(('result', sr.AnalysisOutcome('completed_verified', drawings_verified=True)))
+        self.app.events.put(('result', sr.AnalysisOutcome('completed_response', analysis_completed=True, final_analysis='Offline final response.', drawings_verified=True)))
         self.app.poll_events()
         self.root.update()
         self.success.assert_called_once()
@@ -171,7 +171,7 @@ class StatusVisibilityTests(unittest.TestCase):
         self.assertFalse(self.app.output_section.winfo_ismapped())
         self.assertTrue(self.app.progress.winfo_ismapped())
         self.assertTrue(self.app.status_label.winfo_ismapped())
-        self.assertIn('completed_verified', self.app.status_label._label.cget('text'))
+        self.assertIn('completed_response', self.app.status_label._label.cget('text'))
 
     def test_progress_row_fits_without_overlap_at_both_window_widths(self):
         messages = ('Ready — no analysis has been run',

@@ -1,8 +1,8 @@
 # Contributing
 
 Thank you for helping improve Trade With AM — Price Action Trading Agent.
-The intended repository is `tradewithamofficial/Price-Action-Trading-Agent`;
-publication is pending. Follow these steps once the repository is available.
+The repository is `tradewithamofficial/Price-Action-Trading-Agent`.
+Use a pull request and preserve the protected main branch.
 
 1. Fork the repository and clone your fork.
 2. Create a feature branch, for example `git switch -c improve-status-text`.
@@ -21,12 +21,12 @@ On Windows, from the source folder, using Python 3.14 (the tested series):
 ```powershell
 py -3.14 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
-.\.venv\Scripts\python.exe -m unittest tests.test_repository_release tests.test_dark_dialogs tests.test_dark_ui tests.test_status_visibility tests.test_agent_image tests.test_trade_setups.SetupGuiTests tests.test_symbol_selection.SelectionGuiTests tests.test_telegram_sender.TelegramGuiTests tests.test_prompt_styles tests.test_release.SourceIconTests -v
+.\.venv\Scripts\python.exe -m unittest tests.test_direct_analysis tests.test_grouping tests.test_mcp_approval tests.test_preservation_diagnostics tests.test_repository_release tests.test_dark_dialogs tests.test_dark_ui tests.test_status_visibility tests.test_agent_image tests.test_trade_setups tests.test_symbol_selection tests.test_telegram_sender tests.test_prompt_styles tests.test_packaging -q
 ```
 
-This explicit suite uses mocked services. Do **not** run unrestricted test discovery:
-the legacy `tests.test_packaged_gui` reads a live TradingView watchlist. Additional
-offline core suites and build checks are described in [the technical guide](docs/TECHNICAL.md).
+This explicit suite uses mocked services. Additional build checks are described
+in [the technical guide](docs/TECHNICAL.md). Keep the authoritative files in
+`reference_simple` editable; do not replace their analysis with Python market rules.
 Real UI tests require a Windows desktop session. Some core tests also need Node.js
 to execute fake connector modules; those tests do not connect to TradingView.
 

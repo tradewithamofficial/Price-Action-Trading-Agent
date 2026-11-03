@@ -2,7 +2,15 @@
 
 Prepared on **2026-10-19** for the intended repository
 `tradewithamofficial/Price-Action-Trading-Agent`. This is a local review document,
-not a claim that a repository or release already exists.
+not a claim that a repository or release already existed at that date.
+
+## v1.1.0 candidate update — 2026-11-03
+
+The historical audit below is retained. The repository and v1.0.0 are now public;
+main is protected. The direct Codex upgrade is prepared on a separate development
+branch, without overwriting v1.0.0 assets. See [upgrade validation](DIRECT-CODEX-UPGRADE.md).
+The new candidate must not be advertised as live-verified or published as a finished
+release while the inherited noninteractive MCP approval blocker remains unresolved.
 
 ## Owner decisions and final audit (Step 544)
 
